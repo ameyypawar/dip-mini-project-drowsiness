@@ -33,3 +33,6 @@ data/processed/*
 
 # Submission bundle built for portal upload (not part of the repo)
 DIP_Task1_Dataset_40images.zip
+
+# Regenerable feature cache (32MB) - rebuilt by src/features.py on demand
+data/features/hog_lbp_cache.npz
