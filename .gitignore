@@ -1,0 +1,32 @@
+# Python virtual environment
+.venv/
+
+# Python bytecode / cache
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# OpenDocument spreadsheets (working files, not deliverables)
+*.ods
+
+# --- Dataset staging ---
+# data/raw and data/processed hold large, re-derivable dataset files that
+# should not be committed. Only .gitkeep is tracked so the empty directory
+# structure survives a clone; git will not descend into a fully-excluded
+# directory, so the `dir/*` + negation form is required here.
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# NOTE: data/samples/ is intentionally NOT ignored. It holds a small (~40
+# image) curated, redistributable subset of the dataset and is itself a
+# graded deliverable for this project.
+#
+# NOTE: results/ is intentionally NOT ignored. Generated figures/outputs
+# checked in here are graded deliverables.

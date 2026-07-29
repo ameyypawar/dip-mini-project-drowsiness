@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DIP Mini Project Proposal — Driver Drowsiness Detection</title>
+<style>
+  @page { size: A4; margin: 12mm 14mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.28;
+    color: #111;
+    margin: 0;
+    padding: 0;
+  }
+  h1 {
+    font-size: 15pt;
+    margin: 0 0 2mm 0;
+    text-align: center;
+  }
+  h2 {
+    font-size: 11pt;
+    margin: 3mm 0 1mm 0;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.5mm;
+    break-after: avoid;
+  }
+  p { margin: 0.8mm 0; text-align: justify; }
+  ul, ol { margin: 0.8mm 0 0.8mm 4mm; padding: 0; }
+  li { margin: 0.3mm 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1mm 0;
+    font-size: 9pt;
+    break-inside: avoid;
+  }
+  th, td {
+    border: 0.5px solid #666;
+    padding: 1mm 1.5mm;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #eee; }
+  .sub-note {
+    margin-top: 1mm;
+    padding: 1mm 2mm;
+    background: #f4f4f4;
+    border-left: 2px solid #555;
+  }
+  .team-table td, .team-table th { text-align: center; }
+  .tools-line { margin: 0.8mm 0; }
+</style>
+</head>
+<body>
+
+<h1>Driver Drowsiness Detection using Digital Image Processing</h1>
+
+<h2>Team Members</h2>
+<table class="team-table">
+  <tr><th>Name</th><th>Roll Number</th></tr>
+  <tr><td>Amey Pawar</td><td>23108B0057</td></tr>
+  <tr><td>Sejal Andhale</td><td>23108B0049</td></tr>
+</table>
+
+<h2>Problem Statement</h2>
+<p>
+Driver fatigue is a leading contributor to road accidents, yet most vehicles lack any
+onboard mechanism to detect drowsiness before it causes a crash. This project builds a
+vision-based driver drowsiness detection system that classifies eye state (open/closed)
+from image data and, at inference time, tracks eyelid-closure behaviour over live video to
+raise a timely alert. The system is trained on cropped infrared eye images rather than full
+faces, so the methodology must bridge from a static, cropped-eye training source to
+temporal, whole-face live inference.
+</p>
+<div class="sub-note">
+<b>Existing Solutions &amp; Research Gap:</b> Widely used open-source pipelines
+(e.g. the PyImageSearch dlib+EAR tutorial and its many GitHub derivatives) rely on a single,
+manually tuned Eye Aspect Ratio (EAR) threshold applied uniformly to all users. This fails
+across individuals with different eye shapes, users wearing eyeglasses (glare/occlusion),
+and low-light or infrared night-driving conditions. Deep-learning classifiers (CNN,
+transformer) raise raw accuracy but are typically evaluated on clean, well-lit datasets and
+do not address these preprocessing failure modes. Commercial systems (Bosch, Volvo, Seeing
+Machines) achieve robustness with expensive dedicated hardware. This project targets the
+gap with a DIP-heavy enhancement/segmentation front-end and adaptive thresholding instead of
+a fixed EAR cutoff.
+</div>
+
+<h2>Objectives</h2>
+<ul>
+  <li>Curate and characterize the MRL Eye Dataset for eye-state classification.</li>
+  <li>Design an enhancement front-end (CLAHE, gamma, glare suppression) for low-light/IR crops.</li>
+  <li>Segment sclera/iris/pupil regions and clean masks via morphological operations.</li>
+  <li>Apply DFT/DCT transforms for blur rejection and Hough-circle iris fitting.</li>
+  <li>Implement adaptive-threshold EAR/MAR and PERCLOS at inference time on live video.</li>
+  <li>Quantify JPEG/DCT compression trade-offs for in-vehicle frame transmission.</li>
+</ul>
+
+<h2>Proposed Methodology</h2>
+<p>
+The pipeline separates a <b>training stage</b> on the MRL Eye Dataset from an
+<b>inference stage</b> on live webcam/video. In training, cropped infrared eye images are
+size-normalized, enhanced with CLAHE and gamma correction, and segmented via adaptive/Otsu
+thresholding to isolate sclera, iris, and pupil; morphological opening/closing and
+hole-filling clean the resulting masks before a classifier is trained to predict eye state
+(open/closed). DFT/DCT-based sharpness checks filter blurred training frames, and Hough
+circle transforms fit the iris boundary for auxiliary shape features. At inference time, a
+Haar-cascade or MediaPipe face/eye localizer extracts eye and mouth regions from live frames;
+Eye Aspect Ratio (EAR) and Mouth Aspect Ratio (MAR) are computed on these localized
+landmarks — never on MRL crops directly, since MRL contains no facial landmarks — and
+combined with an adaptive (per-user-calibrated) threshold rather than one fixed globally.
+PERCLOS is accumulated over a rolling window of a video sequence (validated on a
+self-recorded clip) to give a temporally robust fatigue signal. Finally, a JPEG-quality/DCT
+sweep quantifies the accuracy-vs-bitrate trade-off relevant to transmitting frames from an
+in-vehicle camera to a fleet server.
+</p>
+<table>
+  <tr><th>DIP Topic</th><th>Pipeline Stage</th></tr>
+  <tr><td>Image enhancement</td><td>CLAHE + gamma correction on low-light IR eye crops; reflection suppression for eyeglasses</td></tr>
+  <tr><td>Segmentation</td><td>Sclera/iris/pupil isolation via adaptive + Otsu thresholding</td></tr>
+  <tr><td>Morphological ops</td><td>Opening/closing to clean eye mask; hole-filling before area measurement</td></tr>
+  <tr><td>Transforms</td><td>DFT/DCT for blur &amp; motion detection; Hough circle transform for iris fitting</td></tr>
+  <tr><td>Image compression</td><td>DCT/JPEG quality sweep quantifying accuracy-vs-bitrate for in-vehicle transmission</td></tr>
+</table>
+
+<h2>Dataset Source</h2>
+<p>
+<b>MRL Eye Dataset</b>, VSB — Technical University of Ostrava
+(<i>https://mrl.cs.vsb.cz/data/eyedataset/</i>): 84,898 grayscale infrared eye-crop images
+from 37 subjects, annotated with eye state, gaze direction, glasses, reflections, and
+lighting condition. Images are pre-cropped eye patches of variable size (not full faces), so
+they serve as the training/validation source for the eye-state classification stage only;
+EAR/MAR/PERCLOS are computed at inference time on live frames after face/eye localization,
+not on the dataset itself. A curated 40-image balanced sample (20 open/20 closed) is used for
+Week-1 exploratory analysis.
+</p>
+
+<h2>Expected Outcomes</h2>
+<p>
+A trained eye-state classifier evaluated on held-out MRL subjects; a documented DIP
+preprocessing pipeline (enhancement, segmentation, morphology, transforms) with before/after
+visualizations; a working live-inference demo computing adaptive EAR/MAR and PERCLOS on a
+self-recorded video with an audible/visual drowsiness alert; and a quantified JPEG
+compression-vs-accuracy curve. Collectively these deliverables demonstrate all five mandated
+DIP topics within one coherent, evaluated system.
+</p>
+
+<h2>Software Tools to be Used</h2>
+<p class="tools-line">
+Python 3.11, OpenCV, NumPy, scikit-image, Matplotlib, Pillow, imutils, Jupyter notebooks,
+Haar cascade / MediaPipe (face and eye localization, inference stage), Google Chrome
+(headless PDF rendering for reports), Git/GitHub (version control).
+</p>
+
+</body>
+</html>
