@@ -30,3 +30,6 @@ data/processed/*
 #
 # NOTE: results/ is intentionally NOT ignored. Generated figures/outputs
 # checked in here are graded deliverables.
+
+# Submission bundle built for portal upload (not part of the repo)
+DIP_Task1_Dataset_40images.zip
