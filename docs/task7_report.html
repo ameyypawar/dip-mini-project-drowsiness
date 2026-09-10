@@ -1,0 +1,629 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Task 7 -- Region Growing, Connectivity Comparison, and Region Splitting/Merging</title>
+<style>
+  @page { size: A4; margin: 12mm 12mm 12mm 12mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: Georgia, "Times New Roman", Times, serif;
+    font-size: 10.3pt;
+    line-height: 1.35;
+    color: #111;
+  }
+
+  /* ---- repeating page frame: a <table> with thead/tfoot is the only
+     mechanism Chrome's headless print-to-pdf reliably repeats per printed
+     page (position:fixed is offset by the @page margin box here and does
+     not behave predictably) ---- */
+  table.frame { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.frame > thead { display: table-header-group; }
+  table.frame > tfoot { display: table-footer-group; }
+
+  .hdr-cell { border: 1.1px solid #000; border-bottom: none; padding: 2.5mm 4mm 1.5mm; }
+  .hdr-row { display: flex; align-items: center; justify-content: space-between; gap: 4mm; }
+  .hdr-row img.logo { height: 13mm; width: auto; display: block; }
+  .hdr-row .dept { font-style: italic; font-size: 10pt; text-align: center; flex: 1; }
+  .hdr-row .exp { font-size: 10.5pt; font-weight: bold; text-align: right; white-space: nowrap; }
+  .hdr-rule { border-bottom: 1.1px solid #000; margin-top: 1.5mm; }
+
+  .ftr-cell { border: 1.1px solid #000; border-top: none; height: 5mm; padding: 0; }
+
+  .body-cell { border-left: 1.1px solid #000; border-right: 1.1px solid #000; padding: 3mm 6mm 2mm; }
+
+  .content-wrap { position: relative; }
+  .pagenum {
+    text-align: right; font-size: 8.3pt; color: #333;
+    margin: 3mm 0 0.5mm;
+  }
+
+  h1.doc-title { font-size: 14pt; text-align: center; letter-spacing: 0.5px; margin: 1mm 0 4mm; }
+  h3.sec { font-size: 10.8pt; margin: 4mm 0 1.5mm; border-bottom: 0.8px solid #999; padding-bottom: 0.8mm; }
+  h4.sub { font-size: 10pt; margin: 3mm 0 1mm; }
+  p { margin: 1.2mm 0; text-align: justify; }
+  ol, ul { margin: 1mm 0 1mm 5mm; padding: 0; }
+  li { margin: 0.7mm 0; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.6pt; background: #f2f2f2; padding: 0 0.5mm; }
+  pre {
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.4pt; line-height: 1.3;
+    background: #f6f6f6; border: 0.7px solid #ccc; padding: 2mm 3mm; margin: 1.5mm 0 3mm;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* Table 1 / Table 2 -- info tables */
+  table.info { width: 100%; border-collapse: collapse; margin: 2.5mm 0; font-size: 9.6pt; break-inside: avoid; page-break-inside: avoid; }
+  table.info td, table.info th { border: 0.8px solid #555; padding: 1.4mm 2.5mm; text-align: left; vertical-align: middle; }
+  table.info tr { break-inside: avoid; page-break-inside: avoid; }
+  table.info.t1 td:first-child { font-weight: bold; background: #f2f2f2; width: 46%; }
+  table.info.t2 td.lbl { font-weight: bold; background: #f2f2f2; width: 27%; }
+
+  /* Table 3 -- stack of single-row 2-column mini-tables that read as one
+     continuous table; kept as SEPARATE table elements (not one giant
+     table with page-spanning cells) because Chrome does not paginate the
+     interior of a table cell predictably across pages. */
+  table.t3-row { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0; font-size: 9.7pt; }
+  table.t3-row col.lbl { width: 25%; }
+  table.t3-row td { border: 0.8px solid #555; padding: 2mm 3mm; vertical-align: top; }
+  table.t3-row td.label { font-weight: bold; background: #eee; }
+  table.t3-row.compact { break-inside: avoid; page-break-inside: avoid; }
+  .t3-break { break-before: page; page-break-before: always; }
+
+  /* small data tables (comparison / metrics) */
+  table.data { width: 100%; border-collapse: collapse; margin: 2mm 0; font-size: 8.6pt; }
+  table.data th, table.data td { border: 0.7px solid #888; padding: 1mm 1.8mm; text-align: left; }
+  table.data th { background: #eee; }
+  table.data tr { break-inside: avoid; page-break-inside: avoid; }
+  .winner { background: #eaf6ea; font-weight: bold; }
+  table.wide7 { table-layout: fixed; font-size: 7.3pt; line-height: 1.25; }
+  table.wide7 th, table.wide7 td { padding: 1mm 1.2mm; word-wrap: break-word; overflow-wrap: break-word; }
+  table.wide7 th { font-weight: bold; }
+
+  figure { margin: 2.5mm 0; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+  figure img { max-width: 100%; border: 0.6px solid #ccc; }
+  figcaption { font-size: 8.3pt; color: #333; margin-top: 1mm; }
+
+  .note { font-size: 8.8pt; color: #444; background: #f6f6f6; border-left: 2.2px solid #777; padding: 1.3mm 3mm; margin: 2mm 0; }
+</style>
+</head>
+<body>
+
+<table class="frame">
+<thead>
+  <tr><td class="hdr-cell">
+    <div class="hdr-row">
+      <img class="logo" alt="VIT logo" src="data:image/png;base64,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">
+      <div class="dept">DEPARTMENT OF ELECTRONICS AND COMPUTER SCIENCE</div>
+      <div class="exp">Experiment No. 7</div>
+    </div>
+    <div class="hdr-rule"></div>
+  </td></tr>
+</thead>
+<tfoot>
+  <tr><td class="ftr-cell"></td></tr>
+</tfoot>
+<tbody>
+<tr><td class="body-cell">
+<div class="content-wrap" id="content">
+
+
+<h1 class="doc-title">DIGITAL IMAGE PROCESSING LABORATORY</h1>
+
+<table class="info t1">
+  <tr><td>Semester</td><td>B.E. Semester VII</td></tr>
+  <tr><td>Subject</td><td>Digital Image Processing</td></tr>
+  <tr><td>Subject Professor In-charge</td><td>Prof. Rajashree Soman</td></tr>
+  <tr><td>Laboratory</td><td>L05</td></tr>
+</table>
+
+<table class="info t2">
+  <tr><td class="lbl">Student Name</td><td>Amey Pawar</td><td class="lbl">Division</td><td>B</td></tr>
+  <tr><td class="lbl">Roll Number</td><td>23108B0057</td><td class="lbl">Batch</td><td>2</td></tr>
+  <tr><td class="lbl">Grade and Subject Teacher's Signature</td><td colspan="3">&nbsp;</td></tr>
+</table>
+
+<!-- ============================== Table 3 ============================== -->
+
+<table class="t3-row compact"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Experiment Number</td><td>7</td></tr>
+</table>
+<table class="t3-row compact"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Experiment Title</td><td>Region Growing, Connectivity Comparison, and Region Splitting and Merging</td></tr>
+</table>
+<table class="t3-row compact"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Aim</td><td>
+    To implement seeded region growing (with the region mean updated as pixels are absorbed)
+    for segmenting the iris/pupil in grayscale near-infrared eye-crop images; to compare
+    4-neighbourhood and 8-neighbourhood connectivity quantitatively (region size, shape,
+    boundary behaviour and processing time); and to implement quadtree-based region
+    splitting and merging as a second region-based segmentation technique &ndash; continuing the
+    enhancement (Task 3, histogram equalization) &rarr; edge/threshold segmentation (Task 6) pipeline
+    on the same 3 dataset images, with quantitative rather than visual-only evaluation throughout.
+    <br><br>
+    <b>Why the pupil is the region of interest.</b> In every one of these near-IR eye crops the
+    pupil/iris is the darkest, most compact, roughly circular structure against a brighter
+    sclera and skin &ndash; exactly the seed-and-grow shape assumption region growing depends on,
+    and its area over time is the geometric signal PERCLOS-style drowsiness detection
+    (<code>src/perclos.py</code>) ultimately consumes: a shrinking or vanishing dark region is
+    the visible eye-closure signal this whole project is built to detect.
+  </td></tr>
+</table>
+<table class="t3-row compact"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Resources / Apparatus Required</td><td>
+    Software: Python 3.11 &bull; OpenCV &bull; NumPy &bull; Matplotlib &bull; scikit-image &bull;
+    Pillow &bull; Jupyter Notebook / VS Code
+  </td></tr>
+</table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Algorithm</td><td>
+
+  <h4 class="sub">A. Region Growing</h4>
+  <ol>
+    <li>Start the program.</li>
+    <li>Read the enhanced (histogram-equalized) grayscale eye-crop image as a NumPy
+    <code>uint8</code> array (same enhancement as Task 6's input, for pipeline continuity).</li>
+    <li>Compute an <b>automatic seed</b>: Gaussian-blur the image (5x5) to suppress single-pixel
+    noise, then take the coordinate of the blurred image's global minimum (darkest point) &ndash;
+    this reliably lands inside the pupil in all 3 test images.</li>
+    <li>Also record a <b>manual seed</b>: the geometric centre of the crop, for comparison.</li>
+    <li>From the seed, run BFS: maintain a running region mean (initially the seed's own
+    intensity) and a visited set; for every unvisited 4- or 8-neighbour of a pixel just
+    absorbed, admit it into the region if <code>abs(neighbour - running_mean) &lt;= T</code>.</li>
+    <li><b>Update the region mean</b> after every pixel is absorbed (running mean over all
+    pixels absorbed so far), so later admission decisions track the region's own evolving
+    statistics rather than only the original seed value.</li>
+    <li>Repeat until the queue is empty; output the binary region mask and its pixel count.</li>
+    <li>Repeat for 3 thresholds (Low, Medium, High) and, for the metrics table, a 4th
+    (Very High) to locate where the region starts leaking past the expected pupil area.</li>
+    <li>Stop the program.</li>
+  </ol>
+
+  <h4 class="sub">B. 4- vs 8-Connectivity</h4>
+  <ol>
+    <li>Start the program.</li>
+    <li>Using the same auto seed and a fixed threshold (Medium, <code>T=25</code>), run region
+    growing twice on the same image: once considering only the 4 orthogonal neighbours
+    (up/down/left/right), once considering all 8 neighbours (orthogonal + 4 diagonals).</li>
+    <li>Compute the pixel-count difference, the symmetric difference (XOR) mask between the two
+    results, and each mask's shape compactness (<code>4*pi*Area/Perimeter^2</code> on the
+    largest external contour, via <code>cv2.findContours</code>/<code>cv2.contourArea</code>/
+    <code>cv2.arcLength</code>).</li>
+    <li>Time both variants over 30 repeated calls on the same image/seed/threshold and report the
+    mean per-call time in milliseconds.</li>
+    <li>Stop the program.</li>
+  </ol>
+
+  <h4 class="sub">C. Region Splitting and Merging</h4>
+  <ol>
+    <li>Start the program.</li>
+    <li>Recursively <b>split</b> the image as a quadtree: starting from the whole frame, test a
+    block's homogeneity as <code>max(block) - min(block) &lt;= threshold</code>; if homogeneous,
+    or the block has hit the minimum block size, keep it as a leaf; otherwise split it into 4
+    quadrants (top-left/top-right/bottom-left/bottom-right) and recurse on each.</li>
+    <li>Compute each leaf's mean intensity.</li>
+    <li><b>Merge</b>: build an adjacency graph over leaves that share a boundary edge; union two
+    adjacent leaves (via union-find) whenever their mean intensities differ by no more than the
+    same tolerance used for splitting.</li>
+    <li>Relabel every leaf by its union-find root to produce the final merged-region label map.</li>
+    <li>Report the number of leaves after splitting and the number of regions remaining after
+    merging.</li>
+    <li>Stop the program.</li>
+  </ol>
+
+  </td></tr>
+</table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Program code</td><td>
+
+  <p class="note">Trimmed to the essential logic. Full module: <code>src/region_growing.py</code>.
+  Every function takes/returns a single-channel <code>uint8</code> NumPy array; nothing in
+  <code>src/enhancement.py</code> or <code>src/segment.py</code> (both reused as-is) is modified.</p>
+
+  <h4 class="sub">A. Region Growing</h4>
+<pre>def auto_seed(img, blur_ksize=5):
+    blurred = cv2.GaussianBlur(img, (blur_ksize, blur_ksize), 0)
+    idx = int(np.argmin(blurred))
+    return np.unravel_index(idx, blurred.shape)   # (row, col)
+
+def region_grow(img, seed, T, connectivity=8, update_mean=True):
+    neighbours = CONN8 if connectivity == 8 else CONN4
+    visited = np.zeros(img.shape, dtype=bool); mask = np.zeros(img.shape, dtype=np.uint8)
+    sr, sc = seed
+    visited[sr, sc] = True; mask[sr, sc] = 255
+    region_sum, region_count = float(img[sr, sc]), 1
+    mean = region_sum / region_count
+    q = deque([(sr, sc)])
+    while q:
+        r, c = q.popleft()
+        for dr, dc in neighbours:
+            nr, nc = r + dr, c + dc
+            if 0 &lt;= nr &lt; h and 0 &lt;= nc &lt; w and not visited[nr, nc]:
+                visited[nr, nc] = True
+                if abs(int(img[nr, nc]) - mean) &lt;= T:
+                    mask[nr, nc] = 255
+                    region_count += 1; region_sum += img[nr, nc]
+                    if update_mean:                 # "update the region mean if required"
+                        mean = region_sum / region_count
+                    q.append((nr, nc))
+    return mask, region_count</pre>
+
+  <h4 class="sub">C. Region Splitting and Merging</h4>
+<pre>def _homogeneous(block, threshold):
+    return int(block.max()) - int(block.min()) &lt;= threshold
+
+def _quadtree_split(img, r0, r1, c0, c1, min_size, threshold, leaves):
+    h, w = r1 - r0, c1 - c0
+    if h &lt;= min_size or w &lt;= min_size or _homogeneous(img[r0:r1, c0:c1], threshold):
+        leaves.append((r0, r1, c0, c1)); return
+    rm, cm = r0 + h // 2, c0 + w // 2
+    _quadtree_split(img, r0, rm, c0, cm, min_size, threshold, leaves)  # top-left
+    _quadtree_split(img, r0, rm, cm, c1, min_size, threshold, leaves)  # top-right
+    _quadtree_split(img, rm, r1, c0, cm, min_size, threshold, leaves)  # bottom-left
+    _quadtree_split(img, rm, r1, cm, c1, min_size, threshold, leaves)  # bottom-right
+
+def split_merge(img, min_size=20, homogeneity_threshold=25, merge_tolerance=None):
+    leaves = []; _quadtree_split(img, 0, h, 0, w, min_size, homogeneity_threshold, leaves)
+    means = [float(img[r0:r1, c0:c1].mean()) for (r0,r1,c0,c1) in leaves]
+    parent = list(range(len(leaves)))               # union-find
+    for i, j in adjacent_leaf_pairs(leaves):
+        if abs(means[i] - means[j]) &lt;= (merge_tolerance or homogeneity_threshold):
+            union(parent, i, j)
+    return relabel_by_root(leaves, parent)           # -> labels, n_leaves, n_regions</pre>
+
+  </td></tr>
+</table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Output</td><td>
+
+  <p>Same 3 test images as Task 3 / Task 6, each loaded, upscaled with
+  <code>cv2.INTER_NEAREST</code> (minimum 300px side), and histogram-equalized before region
+  growing / splitting / merging.</p>
+
+  <table class="data">
+    <tr><th>Label</th><th>File</th><th>Condition</th><th>Native size</th><th>Native min / max intensity</th></tr>
+    <tr><td>good_lighting</td><td><code>alert/s0031_00366_1_0_1_0_1_02.png</code></td><td>open eye, no glasses, good lighting, no reflection</td><td>128x128</td><td>19 / 148</td></tr>
+    <tr><td>poor_lighting</td><td><code>alert/s0014_08297_0_0_1_1_0_02.png</code></td><td>open eye, no glasses, poor/uneven lighting</td><td>130x130</td><td>8 / 255</td></tr>
+    <tr><td>glasses_reflection</td><td><code>alert/s0035_00133_0_1_1_2_1_02.png</code></td><td>open eye, eyeglasses + strong IR reflection (glare hotspot)</td><td>144x144</td><td>27 / 255</td></tr>
+  </table>
+
+  <h4 class="sub">Step 1 &ndash; original / grayscale, with dimensions and intensity range</h4>
+  <figure>
+    <img src="../results/task7_step1_good_lighting.png" alt="Step 1 good lighting">
+    <figcaption>Figure 1: Step 1 &ndash; good_lighting: 128x128, min=19, max=148.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_step1_poor_lighting.png" alt="Step 1 poor lighting">
+    <figcaption>Figure 2: Step 1 &ndash; poor_lighting: 130x130, min=8, max=255.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_step1_glasses_reflection.png" alt="Step 1 glasses reflection">
+    <figcaption>Figure 3: Step 1 &ndash; glasses_reflection: 144x144, min=27, max=255.</figcaption>
+  </figure>
+  <p class="note">The dataset PNGs are already single-channel infrared crops, so the
+  "Original" (<code>IMREAD_COLOR</code>, channel-replicated) and "Grayscale"
+  (<code>cvtColor BGR2GRAY</code>) panels are numerically identical here &ndash; both panels are
+  still produced to follow the standard Step-1 read/convert/report procedure.</p>
+
+  <h4 class="sub">Seeds used</h4>
+  <table class="data">
+    <tr><th>Image</th><th>Auto seed (row, col)</th><th>Auto seed intensity</th><th>Manual seed (row, col)</th><th>Manual seed intensity</th></tr>
+    <tr><td>good_lighting</td><td>(123, 114)</td><td>0</td><td>(128, 128) &ndash; centre</td><td>1</td></tr>
+    <tr><td>poor_lighting</td><td>(133, 106)</td><td>0</td><td>(130, 130) &ndash; centre</td><td>54</td></tr>
+    <tr><td>glasses_reflection</td><td>(152, 143)</td><td>0</td><td>(144, 144) &ndash; centre</td><td>3</td></tr>
+  </table>
+  <p class="note">The automatic seed (darkest point after a 5x5 Gaussian blur) lands exactly on
+  a 0-intensity pixel inside the pupil on all 3 images. The manual seed (geometric centre of the
+  crop) is close by construction but noticeably brighter on <code>poor_lighting</code>
+  (intensity 54 vs. 0) &ndash; the pupil there is off-centre in the crop, so a naive "assume the
+  pupil is centred" manual placement is measurably worse than the automatic darkest-point seed.</p>
+
+  <h4 class="sub">Region growing at 3 thresholds, per image</h4>
+  <figure>
+    <img src="../results/task7_regiongrow_good_lighting.png" alt="Region growing good lighting">
+    <figcaption>Figure 4: Region growing, auto seed at Low/Medium/High T, and manual seed at Medium T &ndash; good_lighting.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_connectivity_good_lighting.png" alt="Connectivity good lighting">
+    <figcaption>Figure 5: 4- vs 8-connectivity at T=25, with XOR difference map &ndash; good_lighting.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_splitmerge_good_lighting.png" alt="Split-merge good lighting">
+    <figcaption>Figure 6: Quadtree split boundaries and final merged regions &ndash; good_lighting.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_regiongrow_poor_lighting.png" alt="Region growing poor lighting">
+    <figcaption>Figure 7: Region growing, auto seed at Low/Medium/High T, and manual seed at Medium T &ndash; poor_lighting.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_connectivity_poor_lighting.png" alt="Connectivity poor lighting">
+    <figcaption>Figure 8: 4- vs 8-connectivity at T=25, with XOR difference map &ndash; poor_lighting.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_splitmerge_poor_lighting.png" alt="Split-merge poor lighting">
+    <figcaption>Figure 9: Quadtree split boundaries and final merged regions &ndash; poor_lighting.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_regiongrow_glasses_reflection.png" alt="Region growing glasses reflection">
+    <figcaption>Figure 10: Region growing, auto seed at Low/Medium/High T, and manual seed at Medium T &ndash; glasses_reflection.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_connectivity_glasses_reflection.png" alt="Connectivity glasses reflection">
+    <figcaption>Figure 11: 4- vs 8-connectivity at T=25, with XOR difference map &ndash; glasses_reflection.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_splitmerge_glasses_reflection.png" alt="Split-merge glasses reflection">
+    <figcaption>Figure 12: Quadtree split boundaries and final merged regions &ndash; glasses_reflection.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_summary_bars.png" alt="Region size vs threshold summary">
+    <figcaption>Figure 13: Region size (% of image) vs. threshold, all 3 images.</figcaption>
+  </figure>
+
+  <h4 class="sub">Threshold effect (region size, missing pixels, leakage, segmentation accuracy)</h4>
+  <p class="note">"Missing pixels" / "leakage" / "segmentation accuracy" are measured against a
+  reference pupil mask reused as-is from <code>src.segment.segment_eye</code> (Otsu value scaled
+  by 0.7 to anchor on the pupil's darker core, then largest-connected-component isolation) &ndash;
+  not a hand-labelled ground truth, but the same reference Task 6 documents as this project's own
+  pupil-isolation anchor. Missing = reference pixels the grown region has not yet reached;
+  leakage = grown-region pixels outside that reference; accuracy = IoU between the two.</p>
+  <table class="data wide7">
+    <colgroup><col style="width:14%"><col style="width:10%"><col style="width:8%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:13%"><col style="width:13%"></colgroup>
+    <tr><th>Image</th><th>Threshold</th><th>T</th><th>Region size (px, % image)</th><th>Reference pupil px</th><th>Missing px</th><th>Leakage px</th><th>Accuracy (IoU)</th></tr>
+    <tr><td rowspan="4">good_lighting</td><td>Low</td><td>10</td><td>3,961 (6.0%)</td><td rowspan="4">22,316</td><td>18,355</td><td>0</td><td>0.178</td></tr>
+    <tr><td>Medium</td><td>25</td><td>9,246 (14.1%)</td><td>13,070</td><td>0</td><td>0.414</td></tr>
+    <tr><td>High</td><td>45</td><td>17,523 (26.7%)</td><td>4,793</td><td>0</td><td>0.785</td></tr>
+    <tr class="winner"><td>Very High</td><td>60</td><td>24,750 (37.8%)</td><td>429</td><td><b>2,863</b></td><td>0.869</td></tr>
+    <tr><td rowspan="4">poor_lighting</td><td>Low</td><td>10</td><td>1,049 (1.6%)</td><td rowspan="4">11,880</td><td>10,831</td><td>0</td><td>0.088</td></tr>
+    <tr><td>Medium</td><td>25</td><td>1,352 (2.0%)</td><td>10,528</td><td>0</td><td>0.114</td></tr>
+    <tr class="winner"><td>High</td><td>45</td><td>11,130 (16.5%)</td><td>750</td><td>0</td><td>0.937</td></tr>
+    <tr><td>Very High</td><td>60</td><td>16,134 (23.9%)</td><td>21</td><td><b>4,275</b></td><td>0.734</td></tr>
+    <tr><td rowspan="4">glasses_reflection</td><td>Low</td><td>10</td><td>5,528 (6.7%)</td><td rowspan="4">15,776</td><td>10,248</td><td>0</td><td>0.350</td></tr>
+    <tr><td>Medium</td><td>25</td><td>8,770 (10.6%)</td><td>7,006</td><td>0</td><td>0.556</td></tr>
+    <tr><td>High</td><td>45</td><td>12,683 (15.3%)</td><td>3,093</td><td>0</td><td>0.804</td></tr>
+    <tr class="winner"><td>Very High</td><td>60</td><td>15,404 (18.6%)</td><td>372</td><td>0</td><td>0.976</td></tr>
+  </table>
+
+  <h4 class="sub">4- vs 8-connected comparison, T=25 (Medium)</h4>
+  <table class="data wide7">
+    <colgroup><col style="width:12%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:14%"><col style="width:14%"></colgroup>
+    <tr><th>Connectivity</th><th>Region size (px)</th><th>Shape (compactness, mean)</th><th>Connectivity of diagonal pixels</th><th>Region leakage (extra px from diagonal steps)</th><th>Processing time (mean, ms/call)</th><th>Suitability for this application</th></tr>
+    <tr><td>4-connected</td><td>9,066 / 1,352 / 8,744</td><td>0.487 (rounder)</td><td>Excluded &ndash; only orthogonal steps</td><td>0 (reference)</td><td>3.90</td><td>Cheaper, but misses diagonal-adjacent pupil-boundary pixels</td></tr>
+    <tr class="winner"><td>8-connected</td><td>9,246 / 1,352 / 8,770</td><td>0.435 (more jagged)</td><td>Included &ndash; orthogonal + 4 diagonals</td><td>+252 / +4 / +91 px (up to 2.8%)</td><td>5.68 (1.45x slower)</td><td>Recommended default &ndash; absorbs real diagonal-adjacent pupil pixels that 4-conn's orthogonal-only steps miss; ~46% slower per call is immaterial at &lt;10ms/call on these crop sizes</td></tr>
+  </table>
+  <p class="note">Region size triplets are (good_lighting / poor_lighting / glasses_reflection).
+  On <code>poor_lighting</code> the two connectivities give an <b>identical</b> pixel count
+  (1,352) &ndash; the small, tightly-bounded pupil ring there never needs a diagonal-only step to
+  reach any of its neighbours. Neither connectivity is strictly a superset of the other: on
+  <code>good_lighting</code>, 252 pixels are reachable only via 8-connectivity's diagonal steps,
+  but 72 pixels are absorbed by 4-connectivity <i>and not</i> 8-connectivity &ndash; because
+  8-connectivity's diagonal-first paths shift the running region mean earlier in the BFS, so a
+  handful of borderline pixels that 4-connectivity's slower orthogonal-only mean drift still
+  admits fail the 8-connected run's already-shifted mean test. Full per-image numbers in
+  <code>results/task7_connectivity_metrics.csv</code>.</p>
+
+  <h4 class="sub">Split-merge (quadtree split, min block 20px, homogeneity/merge tolerance 25)</h4>
+  <table class="data">
+    <tr><th>Image</th><th>Leaves after split</th><th>Regions after merge</th><th>Reduction</th></tr>
+    <tr><td>good_lighting</td><td>250</td><td>13</td><td>19.2x</td></tr>
+    <tr><td>poor_lighting</td><td>250</td><td>37</td><td>6.8x</td></tr>
+    <tr><td>glasses_reflection</td><td>256</td><td>47</td><td>5.4x</td></tr>
+  </table>
+
+  </td></tr>
+</table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Observations</td><td>
+
+  <p><b>Region growing and thresholds.</b> Region size grows monotonically with <code>T</code> on
+  all 3 images, but not linearly: on <code>poor_lighting</code> the region barely moves from Low
+  to Medium (1,049 &rarr; 1,352px, a 1.3x step for a 2.5x change in T) and then jumps 8.2x from
+  Medium to High (1,352 &rarr; 11,130px) &ndash; the pupil ring stays isolated until <code>T</code>
+  crosses the intensity gap to the surrounding dark eyelid crease, at which point growth escapes
+  the ring almost immediately (visible in Figure 7). <code>good_lighting</code> and
+  <code>glasses_reflection</code> grow more smoothly (largest single-step ratios 2.33x and 1.59x)
+  because their pupil-to-surround intensity gap is shallower. <b>Leakage past the reference pupil
+  mask is zero at Low/Medium/High on every image</b> and only appears at Very High
+  (<code>T=60</code>): 2,863px on good_lighting, 4,275px on poor_lighting, but still 0px on
+  glasses_reflection &ndash; the IR glare hotspot's sharp bright/dark boundary in that image acts
+  as a natural stopping edge that constrains growth even at the highest threshold tested, exactly
+  the boundary-preserving behaviour Figure 10 shows (the mask hugs the eyelid contour without
+  spilling past it at any of the 4 thresholds). Leakage does not automatically hurt accuracy:
+  on good_lighting and glasses_reflection, IoU keeps rising through Very High (0.785&rarr;0.869
+  and 0.804&rarr;0.976) because missing pixels keep shrinking faster than leakage grows, but on
+  poor_lighting IoU actually peaks at High (0.937) and falls back to 0.734 at Very High &ndash;
+  there, leakage growth (0&rarr;4,275px) outpaces the remaining recovery of missing pixels
+  (750&rarr;21px), so continuing to raise <code>T</code> past that point actively hurts accuracy
+  rather than helping it.</p>
+
+  <p><b>Manual vs. automatic seeding.</b> The automatic seed (darkest point after a light blur)
+  lands on a true 0-intensity pixel inside the pupil on all 3 images. The manual seed (crop
+  centre) is intensity 1 on good_lighting and intensity 3 on glasses_reflection &ndash; close
+  enough that its Medium-threshold region size is within 1% of the auto-seed result on both
+  (e.g. glasses_reflection: 8,777px manual vs. 8,770px auto). But on <code>poor_lighting</code>
+  the manual seed sits on an intensity-54 pixel (the pupil is measurably off-centre in that crop)
+  and its Medium-T region (7,002px) is over 5x larger than the auto-seed result (1,352px), because
+  it starts from a brighter running mean and immediately incorporates part of the iris/sclera
+  boundary that the correctly-centred auto seed does not yet reach at the same <code>T</code>
+  (Figure 7, rightmost panel). Automatic darkest-point seeding is measurably more reliable here
+  than assuming the pupil is centred.</p>
+
+  <p><b>4- vs 8-connectivity.</b> The size difference is small in absolute terms (0-252px, at
+  most 2.8% of the 4-connected count) but not zero, and not one-directional: 8-connectivity picks
+  up 252/4/91 diagonal-reachable pixels the 4-connected run misses on the 3 images respectively,
+  while 4-connectivity separately keeps 72/4/65 pixels that the 8-connected run's earlier
+  diagonal absorptions end up excluding once its running mean has shifted &ndash; visible as both
+  colours of speckle in the Figure 5/8/11 XOR maps, not a one-sided fringe. Shape compactness is
+  measurably lower for 8-connectivity on 2 of 3 images (0.526 &rarr; 0.415 on good_lighting,
+  0.609 &rarr; 0.566 on poor_lighting; unchanged at 0.325 on glasses_reflection), i.e. the extra
+  diagonal reach makes the boundary slightly more jagged rather than rounder. Processing time is
+  consistently higher for 8-connectivity (1.42x-1.47x, mean 1.45x, across 30 timed repeats per
+  image) &ndash; expected, since every popped pixel tests 8 candidate neighbours instead of 4 &ndash;
+  but the absolute cost difference (0.4-2.6ms/call) is irrelevant at this image scale.</p>
+
+  <p><b>Region splitting and merging.</b> Splitting alone produces 250-256 leaves on all 3
+  images (nearly all blocks split down to the 20px minimum rather than stopping early on
+  homogeneity &ndash; histogram equalization raises local contrast/noise enough that few 20px+
+  blocks satisfy the max-min &lt;= 25 test before hitting the size floor). Merging collapses this
+  by 5.4x-19.2x: most aggressively on <code>good_lighting</code> (250 &rarr; 13 regions), whose
+  large, evenly-lit sclera/skin background merges into very few big regions, and least on
+  <code>glasses_reflection</code> (256 &rarr; 47 regions), whose glare hotspot, eyelid crease and
+  reflection streak fragment the intensity landscape into many small mean-distinct patches that
+  never satisfy the merge tolerance with their neighbours (visible in Figure 12's much more
+  fragmented colour map compared to Figure 6's).</p>
+
+  <p><b>Honest limitation.</b> The reference pupil mask used for missing/leakage/accuracy
+  (<code>src.segment.segment_eye</code>'s Otsu-anchored dark-core mask) is itself an
+  approximation, not ground truth &ndash; Task 6 already documents that dataset-wide Otsu-derived
+  masks on these crops can include eyebrow/eyelash strips alongside the pupil. This is visible
+  directly in Figure 7 (poor_lighting): the region-growing mask at High threshold visually
+  connects into the eyelid crease above the pupil, yet the leakage column still reads 0 at that
+  threshold, because the reference mask's own dark-core envelope already extends into that same
+  crease. Accuracy numbers here should be read as "recovery of the same dark-core envelope Task 6
+  anchors on", not as pupil-only ground-truth accuracy.</p>
+
+  </td></tr>
+</table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Conclusion</td><td>
+  <p>
+  Seeded region growing with a continuously-updated region mean was implemented in
+  <code>src/region_growing.py</code> and evaluated on the same 3 dataset images used in Tasks 3
+  and 6, using an automatic darkest-point seed (verified more reliable than a naive centred
+  manual seed, especially on the off-centre pupil in <code>poor_lighting</code>) and 4 threshold
+  levels. Region size grows with threshold on every image but the growth is non-linear, with a
+  measured leakage-onset point (past the reference Otsu-anchored pupil mask) between the High and
+  Very High thresholds on good_lighting/poor_lighting, and no leakage at all within the tested
+  range on glasses_reflection, where the IR glare boundary constrains growth. <b>8-connectivity</b>
+  is the better default for this application: it recovers a small but real set of diagonal-
+  adjacent pupil-boundary pixels (up to 2.8% more coverage) that 4-connectivity's orthogonal-only
+  steps miss, at a processing-time cost (mean 1.45x slower, low single-digit milliseconds either
+  way) that is immaterial at this image scale &ndash; though the comparison also showed neither
+  connectivity is strictly a superset of the other, since the running-mean update makes the two
+  BFS traversals diverge slightly rather than merely differ by a fixed diagonal fringe.
+  <b>Region splitting and merging</b> (quadtree split + union-find merge) was implemented as a
+  second region-based technique in the same module: splitting alone produced 250-256 leaves on
+  all 3 images (most blocks hit the 20px size floor rather than stopping early on homogeneity),
+  and merging reduced this by 5.4x-19.2x, least aggressively on <code>glasses_reflection</code>
+  whose glare/reflection/eyelid-crease intensity landscape resists merging into large uniform
+  regions. All quantitative claims in this report are grounded in the measured CSVs
+  (<code>results/task7_threshold_metrics.csv</code>, <code>results/task7_connectivity_metrics.csv</code>,
+  <code>results/task7_splitmerge_metrics.csv</code>), not visual impression alone.
+  </p>
+  </td></tr>
+</table>
+
+</div>
+</td></tr>
+</tbody>
+</table>
+
+<script>
+(function () {
+  var content = document.getElementById('content');
+
+  // Seam-anchored pagination: rather than computing a pixel offset and
+  // hoping it lands on the right page (which drifted and occasionally
+  // overlapped a figure), find real DOM "seams" (paragraph/list-item/
+  // figure/table/heading boundaries) and insert a normal-flow page-number
+  // marker immediately before whichever seam element crosses each
+  // computed page boundary. Because the marker becomes an ordinary sibling
+  // of real content, Chrome's own print layout places it correctly -- it
+  // can never end up drawn on top of a figure, since seams are always
+  // *between* atomic blocks, never inside one.
+  function paginate() {
+    var pxPerMM = 96 / 25.4;
+    var pageHeightMM = 297, marginTopMM = 12, marginBottomMM = 12;
+    var thead = document.querySelector('table.frame > thead');
+    var tfoot = document.querySelector('table.frame > tfoot');
+    var theadPx = thead.getBoundingClientRect().height;
+    var tfootPx = tfoot.getBoundingClientRect().height;
+    var pagePx = pageHeightMM * pxPerMM;
+    var marginPx = (marginTopMM + marginBottomMM) * pxPerMM;
+    // empirically calibrated against this document's actual rendered PDF
+    // (screen-mode measurement here slightly under-estimates how much
+    // content really fits per print page)
+    var contentHeightPx = (pagePx - marginPx - theadPx - tfootPx) * 1.06;
+
+    var contentTop = content.getBoundingClientRect().top + window.scrollY;
+    var totalPx = content.scrollHeight;
+
+    // "Atomic" (break-inside:avoid) blocks get pushed whole onto the next
+    // page by the print engine when they don't fit the remaining space --
+    // our continuous (unpaginated) measurement pass does not know that, so
+    // simulate it: walk every seam in document order tracking a running
+    // offsetAdjust; whenever an atomic block would straddle a page
+    // boundary (and fits within one page on its own), bump it -- and
+    // everything measured after it -- down to the next page start.
+    var seamEls = content.querySelectorAll(
+      'figure, table.data, table.info, table.t3-row, h4.sub, p, li'
+    );
+    var atomicTags = { FIGURE: 1 };
+    function isAtomic(el) {
+      return atomicTags[el.tagName] || el.classList.contains('data') ||
+             el.classList.contains('info');
+    }
+
+    var seams = [];
+    var offsetAdjust = 0;
+    for (var k = 0; k < seamEls.length; k++) {
+      var el = seamEls[k];
+      var r = el.getBoundingClientRect();
+      var naturalTop = (r.top + window.scrollY) - contentTop;
+      var top = naturalTop + offsetAdjust;
+      if (isAtomic(el) && r.height <= contentHeightPx) {
+        var pageStart = Math.floor(top / contentHeightPx) * contentHeightPx;
+        var pageEnd = pageStart + contentHeightPx;
+        // small tolerance: screen- vs print-mode font/subpixel rounding
+        // differs slightly, so only simulate a pushback for a real
+        // overflow, not a few stray px of measurement noise.
+        if (top + r.height > pageEnd + 20) {
+          offsetAdjust += (pageEnd - top);
+          top = pageEnd;
+        }
+      }
+      seams.push({ el: el, top: top });
+    }
+    // Tie the denominator directly to the actual distribution of measured
+    // seams across pages (self-consistent with the marker placement below)
+    // rather than an independent formula -- avoids off-by-one drift
+    // between "N of M" and the true rendered page count.
+    var maxSeamPage = 0;
+    for (var m = 0; m < seams.length; m++) {
+      maxSeamPage = Math.max(maxSeamPage, Math.floor(seams[m].top / contentHeightPx));
+    }
+    var tailPage = Math.floor((totalPx + offsetAdjust - 1) / contentHeightPx);
+    var numPages = Math.max(1, maxSeamPage, tailPage) + 1;
+
+    var lastPage = 0;
+    for (var i = 0; i < seams.length; i++) {
+      var seamPage = Math.floor(seams[i].top / contentHeightPx);
+      if (seamPage > lastPage) {
+        for (var p = lastPage; p < seamPage; p++) {
+          var marker = document.createElement('div');
+          marker.className = 'pagenum';
+          marker.textContent = 'Page ' + (p + 1) + ' of ' + numPages;
+          seams[i].el.parentNode.insertBefore(marker, seams[i].el);
+        }
+        lastPage = seamPage;
+      }
+    }
+    for (var q = lastPage; q < numPages; q++) {
+      var lastMarker = document.createElement('div');
+      lastMarker.className = 'pagenum';
+      lastMarker.textContent = 'Page ' + (q + 1) + ' of ' + numPages;
+      content.appendChild(lastMarker);
+    }
+  }
+
+  window.addEventListener('load', paginate);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,13 @@
+image,threshold_label,T,region_pixels,fraction,reference_pupil_pixels,missing_pixels,leakage_pixels,iou_vs_reference,growth_ratio_vs_prev
+good_lighting,Low,10,3961,0.0604,22316,18355,0,0.1775,
+good_lighting,Medium,25,9246,0.1411,22316,13070,0,0.4143,2.334
+good_lighting,High,45,17523,0.2674,22316,4793,0,0.7852,1.895
+good_lighting,Very High,60,24750,0.3777,22316,429,2863,0.8693,1.412
+poor_lighting,Low,10,1049,0.0155,11880,10831,0,0.0883,
+poor_lighting,Medium,25,1352,0.02,11880,10528,0,0.1138,1.289
+poor_lighting,High,45,11130,0.1646,11880,750,0,0.9369,8.232
+poor_lighting,Very High,60,16134,0.2387,11880,21,4275,0.7341,1.45
+glasses_reflection,Low,10,5528,0.0666,15776,10248,0,0.3504,
+glasses_reflection,Medium,25,8770,0.1057,15776,7006,0,0.5559,1.586
+glasses_reflection,High,45,12683,0.1529,15776,3093,0,0.8039,1.446
+glasses_reflection,Very High,60,15404,0.1857,15776,372,0,0.9764,1.215

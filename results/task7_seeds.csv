@@ -1,0 +1,4 @@
+image,auto_seed_row,auto_seed_col,auto_seed_value,manual_seed_row,manual_seed_col,manual_seed_value
+good_lighting,123,114,0,128,128,1
+poor_lighting,133,106,0,130,130,54
+glasses_reflection,152,143,0,144,144,3

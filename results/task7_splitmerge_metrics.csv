@@ -1,0 +1,4 @@
+image,min_size,homogeneity_threshold,n_leaves,n_regions
+good_lighting,20,25,250,13
+poor_lighting,20,25,250,37
+glasses_reflection,20,25,256,47

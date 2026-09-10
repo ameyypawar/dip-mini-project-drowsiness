@@ -1,0 +1,4 @@
+image,native_h,native_w,min,max
+good_lighting,128,128,19,148
+poor_lighting,130,130,8,255
+glasses_reflection,144,144,27,255
