@@ -4,3 +4,6 @@ scikit-image==0.26.0
 matplotlib==3.11.1
 pillow==12.3.0
 imutils==0.5.4
+scikit-learn==1.9.0
+joblib==1.5.3
+mediapipe==1.0.0

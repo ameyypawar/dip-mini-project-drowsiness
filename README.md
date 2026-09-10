@@ -1,135 +1,124 @@
-# Driver Drowsiness Detection
+# Driver Drowsiness Detection using Digital Image Processing
 
-![Week 1 sample grid](results/week1_sample_grid.png)
+Semester mini project — Digital Image Processing.
 
-Digital Image Processing mini project — Week 1: dataset survey, curated samples, and
-project proposal.
-
-## Team
-
-| Name | Roll Number |
+| Student | Roll Number |
 |---|---|
 | Amey Pawar | 23108B0057 |
 | Sejal Andhale | 23108B0049 |
 
-## Problem Statement
+![sample](results/week1_sample_grid.png)
 
-Driver fatigue is a leading contributor to road accidents, and most vehicles lack any
-onboard mechanism to detect drowsiness before it causes a crash. This project builds a
-vision-based driver drowsiness detection system: an eye-state classifier trained on the MRL
-Eye Dataset, combined with live-video EAR/MAR and PERCLOS tracking at inference time, to
-raise a timely fatigue alert. See `docs/literature_survey.md` for the full existing-solutions
-and research-gap analysis.
+## Problem
 
-## Objectives
+Driver fatigue is a leading contributor to road accidents, yet most vehicles have no
+onboard way to detect drowsiness before it causes a crash. This project classifies eye
+state (open/closed) from image data using a classical DIP pipeline, then tracks eyelid
+closure over time (PERCLOS) on live video to raise an alert.
 
-- Curate and characterize the MRL Eye Dataset for eye-state classification.
-- Design an enhancement front-end (CLAHE, gamma, glare suppression) for low-light/IR crops.
-- Segment sclera/iris/pupil regions and clean masks via morphological operations.
-- Apply DFT/DCT transforms for blur rejection and Hough-circle iris fitting.
-- Implement adaptive-threshold EAR/MAR and PERCLOS at inference time on live video.
-- Quantify JPEG/DCT compression trade-offs for in-vehicle frame transmission.
+## Headline results
 
-## DIP Topic Coverage
-
-| DIP Topic | Pipeline Stage |
+| Metric | Value |
 |---|---|
-| Image enhancement | CLAHE + gamma correction on low-light IR eye crops; reflection suppression for eyeglasses |
-| Segmentation | Sclera/iris/pupil isolation via adaptive + Otsu thresholding |
-| Morphological ops | Opening/closing to clean eye mask; hole-filling before area measurement |
-| Transforms | DFT/DCT for blur & motion detection; Hough circle transform for iris fitting |
-| Image compression | DCT/JPEG quality sweep quantifying accuracy-vs-bitrate for in-vehicle transmission |
+| Eye-state test accuracy | **0.8965** |
+| ROC AUC | 0.9621 |
+| Full pipeline throughput | 46.8 fps |
+| Bandwidth at compression knee | 24.3 KB/s (~195 kbit/s) |
 
-Full mapping with concrete OpenCV/scikit-image function calls: `docs/dip_topic_mapping.md`.
+Splits are **subject-disjoint** (train 3720 / val 1140 / test 1140; 22/7/8 subjects), so
+these numbers are not inflated by the same person appearing in train and test. The test
+split was evaluated once, at the end.
 
-## Dataset
+## DIP topic coverage
 
-**MRL Eye Dataset**, VSB — Technical University of Ostrava
-(https://mrl.cs.vsb.cz/data/eyedataset/): 84,898 grayscale infrared eye-crop images, 37
-subjects. A curated, balanced 40-image sample (20 alert / 20 drowsy eye-state) plus a
-manifest is checked into `data/samples/` for Week-1 exploration — see
-`data/samples/README.md` for provenance, per-image metadata, and dataset license/usage
-terms.
+| Topic | Module | Measured result |
+|---|---|---|
+| Image enhancement | `src/preprocess.py`, `src/enhancement.py` | CLAHE 2.0 / tile (4,4), gamma 1.5, glare inpainting; 64×64 canonical size |
+| Spatial filtering | `src/spatial_filtering.py` | median 3×3 best on salt-and-pepper (50.15 dB); mean 5×5 best on Gaussian |
+| Segmentation | `src/segment.py` | Otsu chosen over adaptive (5.82 vs 28.07 components) |
+| Morphological ops | `src/morphology.py` | opening 3×3 → closing 5×5 → hole-fill; 14 shape features |
+| Transforms | `src/transforms.py` | DFT/DCT; Hough iris detection 0.582 open vs 0.377 closed |
+| Compression | `src/compression.py` | JPEG Q=60 knee: 0.8930 accuracy at 0.678 bpp |
 
-## Repository Structure
+## Repository layout
 
 ```
-.
-├── data/
-│   ├── raw/mrlEyes_2018_01/   # full extracted MRL dataset (gitignored)
-│   ├── processed/             # intermediate outputs (gitignored)
-│   └── samples/               # curated 40-image sample + manifest.csv
-│       ├── alert/
-│       ├── drowsy/
-│       ├── manifest.csv
-│       └── README.md
-├── docs/
-│   ├── literature_survey.md
-│   ├── dip_topic_mapping.md
-│   ├── roadmap.md
-│   └── proposal/
-│       ├── proposal.html
-│       └── DIP_Proposal_Drowsiness_Detection.pdf
-├── notebooks/                  # exploratory analysis notebooks
-├── results/
-│   └── week1_sample_grid.png
-├── scripts/
-│   ├── extract_dataset.sh
-│   ├── curate_samples.py
-│   └── make_proposal_pdf.sh
-├── src/                        # future weeks: preprocess.py, ear.py, detect.py, perclos.py
-├── requirements.txt
-└── LICENSE
+src/          pipeline modules (preprocess, enhancement, spatial_filtering,
+              segment, morphology, transforms, features, classify,
+              detect, ear, perclos, compression)
+scripts/      dataset build, feature build, demo app, PDF renderers
+notebooks/    01-09, executed with outputs
+docs/         per-week reports, proposal, task reports (PDF)
+data/samples/ 40 curated MRL images + provenance manifest
+models/       trained eye-state classifier (26.8 MB)
+assets/       Haar cascades + MediaPipe face landmarker
+results/      all figures
 ```
 
-## Setup / Reproduce
+## Setup
 
 ```bash
 python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# extract dataset (already run for this checkout)
-bash scripts/extract_dataset.sh
-
-# regenerate the curated sample set + manifest + grid
-python scripts/curate_samples.py
-
-# regenerate the proposal PDF (headless Chrome, 2-page max, verified)
-bash scripts/make_proposal_pdf.sh
+./.venv/bin/python -m pip install -r requirements.txt
+bash scripts/extract_dataset.sh                 # optional: full MRL dataset
 ```
 
-## Roadmap
+Run the live demo on a video file or webcam:
 
-| Week | Focus | Status |
+```bash
+./.venv/bin/python scripts/run_demo.py --source video --video data/synthetic/sequence.mp4
+./.venv/bin/python scripts/run_demo.py --source webcam
+```
+
+Interactive enhancement menu:
+
+```bash
+./.venv/bin/python scripts/enhance_app.py
+```
+
+## Weekly reports
+
+| Week | Topic | Report |
 |---|---|---|
-| 1 | Survey, dataset curation, proposal | [x] |
-| 2 | Image enhancement + image-size normalization | [ ] |
-| 3 | Segmentation (adaptive/Otsu thresholding) | [ ] |
-| 4 | Morphological operations | [ ] |
-| 5 | Transforms (DFT/DCT, Hough) + self-recorded PERCLOS clip | [ ] |
-| 6 | Eye-state classifier training on MRL | [ ] |
-| 7 | Live inference: EAR/MAR + PERCLOS | [ ] |
-| 8 | Compression sweep + final integration | [ ] |
+| 1 | Proposal, dataset | [proposal](docs/proposal/DIP_Proposal_Drowsiness_Detection.pdf) |
+| 2 | Enhancement | [week2](docs/week2_enhancement.md) |
+| 3 | Segmentation | [week3](docs/week3_segmentation.md) |
+| 4 | Morphology | [week4](docs/week4_morphology.md) |
+| 5 | Transforms | [week5](docs/week5_transforms.md) |
+| 6 | Classification | [week6](docs/week6_classification.md) |
+| 7 | Live inference, PERCLOS | [week7](docs/week7_live_inference.md) |
+| 8 | Compression | [week8](docs/week8_compression.md) |
 
-Full detail: `docs/roadmap.md`.
+Lab task reports: [Task 3 — enhancement](docs/task3_report.pdf),
+[Task 4 — spatial filtering](docs/task4_report.pdf).
 
-## Deliverables
+## Findings worth noting
 
-- Project proposal (2 pages): [`docs/proposal/DIP_Proposal_Drowsiness_Detection.pdf`](docs/proposal/DIP_Proposal_Drowsiness_Detection.pdf)
-- Literature survey: `docs/literature_survey.md`
-- DIP topic mapping: `docs/dip_topic_mapping.md`
-- Roadmap: `docs/roadmap.md`
-- Curated sample dataset + grid visualization: `data/samples/`, `results/week1_sample_grid.png`
+- **Texture beat shape.** Feature ablation showed HOG+LBP reaching 0.884 validation
+  accuracy; adding all segmentation, morphology and transform features changed it by
+  0.0000. They contributed real above-chance signal alone (0.630 and 0.660) but were
+  redundant with texture. HOG and LBP are themselves classical DIP descriptors, so the
+  final model uses no learned feature extractor.
+- **Image-quality metrics mislead.** At JPEG Q15, SSIM reads 0.91 ("good") while
+  classification accuracy has already dropped 8.4 points. Optimising a vision pipeline
+  for PSNR/SSIM optimises the wrong thing.
+- **Denoising rescues segmentation.** Salt-and-pepper noise drove Otsu mask IoU to 0.000
+  on a poorly-lit image; a median 3×3 filter beforehand restored it to 0.90–0.98.
 
-## References
+## Limitations
 
-See `docs/literature_survey.md` for the full numbered reference list (PERCLOS, EAR/MAR,
-PyImageSearch and GitHub reference implementations, CNN/transformer papers, commercial DMS
-systems, EU GSR regulation, MRL Eye Dataset).
+- PERCLOS and EAR/MAR are validated only on a **synthetic** sequence built from MRL
+  stills. No real driving or webcam footage has been tested; the `--source webcam` path
+  is written but unexercised.
+- Alert timing (0.7109 agreement) is materially weaker than per-frame accuracy (0.9031):
+  ~10% per-frame noise accumulated over the PERCLOS window causes false alarms.
+- The adaptive EAR threshold's benefit over a fixed one is unproven without multi-subject
+  footage.
+- Dataset is MRL infrared eye crops only — no full-face driving data.
 
-## License / Attribution
+## Dataset & licence
 
-Code in this repository is MIT-licensed — see `LICENSE`. The license covers code only; it
-does not grant rights to the MRL Eye Dataset. Dataset terms and attribution are documented in
-`data/samples/README.md`.
+MRL Eye Dataset (VSB — Technical University of Ostrava), 84,898 images / 37 subjects.
+A 40-image subset is redistributed here for coursework with attribution; see
+[data/samples/README.md](data/samples/README.md). Code is MIT licensed; the licence
+covers code only.
