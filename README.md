@@ -97,8 +97,10 @@ Every graded PDF lives in **[`submissions/`](submissions/)**:
 | # | Deliverable | File |
 |---|---|---|
 | Task 1 | Project proposal | [Task1_Project_Proposal.pdf](submissions/Task1_Project_Proposal.pdf) |
+| Task 2 | Image fundamentals | [Task2_Image_Fundamentals.pdf](submissions/Task2_Image_Fundamentals.pdf) |
 | Task 3 | Image enhancement | [Task3_Image_Enhancement.pdf](submissions/Task3_Image_Enhancement.pdf) |
 | Task 4 | Spatial filtering | [Task4_Spatial_Filtering.pdf](submissions/Task4_Spatial_Filtering.pdf) |
+| Task 5 | Sharpening & integration | [Task5_Sharpening_Filters.pdf](submissions/Task5_Sharpening_Filters.pdf) |
 | Task 6 | Segmentation | [Task6_Segmentation.pdf](submissions/Task6_Segmentation.pdf) |
 | Task 7 | Region growing | [Task7_Region_Growing.pdf](submissions/Task7_Region_Growing.pdf) |
 | — | Project poster | [Project_Poster.pdf](submissions/Project_Poster.pdf) |

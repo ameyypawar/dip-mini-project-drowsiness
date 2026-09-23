@@ -5,13 +5,15 @@ Every graded deliverable for this mini project, in one place. All PDFs.
 | # | Deliverable | File | Pages |
 |---|---|---|---|
 | Task 1 | Project proposal | [Task1_Project_Proposal.pdf](Task1_Project_Proposal.pdf) | 2 |
+| Task 2 | Image acquisition, representation, fundamentals | [Task2_Image_Fundamentals.pdf](Task2_Image_Fundamentals.pdf) | 12 |
 | Task 3 | Image enhancement in the spatial domain | [Task3_Image_Enhancement.pdf](Task3_Image_Enhancement.pdf) | 11 |
 | Task 4 | Spatial filtering — smoothing and sharpening | [Task4_Spatial_Filtering.pdf](Task4_Spatial_Filtering.pdf) | 13 |
+| Task 5 | Sharpening filters, comparison, integration | [Task5_Sharpening_Filters.pdf](Task5_Sharpening_Filters.pdf) | 13 |
 | Task 6 | Segmentation — edge detection and thresholding | [Task6_Segmentation.pdf](Task6_Segmentation.pdf) | 9 |
 | Task 7 | Region growing, connectivity, split and merge | [Task7_Region_Growing.pdf](Task7_Region_Growing.pdf) | 20 |
 | — | Project poster (A4) | [Project_Poster.pdf](Project_Poster.pdf) | 1 |
 
-Tasks 2 and 5 are not present.
+All seven tasks are present.
 
 ## Regenerating
 
@@ -19,8 +21,10 @@ Each report is rendered from an HTML source in `docs/` via headless Chrome:
 
 ```bash
 bash scripts/make_proposal_pdf.sh   # -> Task1_Project_Proposal.pdf
+bash scripts/make_task2_pdf.sh      # -> Task2_Image_Fundamentals.pdf
 bash scripts/make_task3_pdf.sh      # -> Task3_Image_Enhancement.pdf
 bash scripts/make_task4_pdf.sh      # -> Task4_Spatial_Filtering.pdf
+bash scripts/make_task5_pdf.sh      # -> Task5_Sharpening_Filters.pdf
 bash scripts/make_task6_pdf.sh      # -> Task6_Segmentation.pdf
 bash scripts/make_task7_pdf.sh      # -> Task7_Region_Growing.pdf
 ```
