@@ -1,0 +1,5 @@
+format,bytes,compression_ratio,psnr_db,ssim,bit_identical
+BMP,17462,0.9383,inf,1.0000,True
+PNG,3683,4.4485,inf,1.0000,True
+JPEG (q=95),2460,6.6602,52.30232759332931,0.9957,False
+"JPEG (q=10, illustrative)",590,27.7695,36.18470501831271,0.9055,False

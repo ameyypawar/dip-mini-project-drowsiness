@@ -1,0 +1,9 @@
+property,value
+height,128
+width,128
+channels,1
+total_pixels,16384
+dtype,uint8
+size_bytes,16384
+pixel_coord_yx,"(64, 64)"
+pixel_value,27

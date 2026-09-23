@@ -1,0 +1,10 @@
+image,method,mse,psnr_db,ssim,edge_preservation,noise_amplification_ratio
+good_lighting,laplacian,10.3239,37.9924,0.9477,0.904,5.7423
+good_lighting,gradient,146.9979,26.4577,0.8416,0.6506,2.2906
+good_lighting,high_boost,0.7357,49.4641,0.9949,0.981,1.8436
+poor_lighting,laplacian,89.6114,28.6072,0.7083,0.7562,4.2446
+poor_lighting,gradient,845.4801,18.8598,0.4555,0.3238,2.1596
+poor_lighting,high_boost,6.411,40.0615,0.9627,0.9553,1.6791
+glasses_reflection,laplacian,25.3711,34.0874,0.9519,0.9223,5.1507
+glasses_reflection,gradient,203.75,25.0398,0.8714,0.444,1.1317
+glasses_reflection,high_boost,1.836,45.4921,0.9953,0.9898,1.7031

@@ -1,0 +1,16 @@
+image,filter,mse,psnr_db,ssim,edge_preservation
+good_lighting,Mean 3x3,100.9776,28.0886,0.4913,0.1466
+good_lighting,Gaussian 3x3,125.7517,27.1357,0.4441,0.1086
+good_lighting,Median 3x3,0.7961,49.1213,0.995,0.9821
+good_lighting,Laplacian,2707.7172,13.8048,0.0613,0.0396
+good_lighting,High-Boost (A=2),914.9173,18.517,0.1603,0.0565
+poor_lighting,Mean 3x3,127.4812,27.0763,0.5413,0.3055
+poor_lighting,Gaussian 3x3,152.7584,26.2908,0.5128,0.25
+poor_lighting,Median 3x3,8.8642,38.6544,0.948,0.9353
+poor_lighting,Laplacian,2223.7192,14.66,0.1306,0.2133
+poor_lighting,High-Boost (A=2),1041.2416,17.9553,0.2461,0.162
+glasses_reflection,Mean 3x3,104.3004,27.9479,0.4913,0.3151
+glasses_reflection,Gaussian 3x3,128.3239,27.0477,0.4452,0.2428
+glasses_reflection,Median 3x3,2.7957,43.666,0.9936,0.984
+glasses_reflection,Laplacian,2655.2892,13.8897,0.0647,0.1242
+glasses_reflection,High-Boost (A=2),916.4661,18.5096,0.1622,0.1298

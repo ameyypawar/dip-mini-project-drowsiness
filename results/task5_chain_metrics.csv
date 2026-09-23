@@ -1,0 +1,4 @@
+order,stage,mse,psnr_db,ssim
+noisy_baseline,noisy (no processing),978.7199,18.2242,0.2542
+enhance_then_filter,hist_eq -> median3x3,2742.1157,13.7499,0.7753
+filter_then_enhance,median3x3 -> hist_eq,3139.4806,13.1622,0.7628
