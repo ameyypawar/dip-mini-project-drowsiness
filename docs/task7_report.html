@@ -146,9 +146,198 @@
     sclera and skin &ndash; exactly the seed-and-grow shape assumption region growing depends on,
     and its area over time is the geometric signal PERCLOS-style drowsiness detection
     (<code>src/perclos.py</code>) ultimately consumes: a shrinking or vanishing dark region is
-    the visible eye-closure signal this whole project is built to detect.
+    the visible eye-closure signal this whole project is built to detect. Figure 20 places this
+    task in the full pipeline: acquisition &rarr; enhancement (Task 3) &rarr; filtering (Task 4) &rarr;
+    <b>segmentation (Task 6 / 7, this report)</b> &rarr; feature extraction &rarr; drowsiness decision.
   </td></tr>
 </table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Theory &amp; Formal Background</td><td>
+
+  <h4 class="sub">Formal problem statement</h4>
+  <p>Let the image domain be a discrete grid &Omega; &sub; &#8484;&sup2;, with intensity function
+  I : &Omega; &rarr; {0, &hellip;, 255} (the <code>uint8</code> convention used throughout this
+  project). A <b>segmentation</b> of &Omega; is a partition into n disjoint regions
+  R&#8321;, &hellip;, R&#8345; satisfying the classical region-based conditions:</p>
+  <ol>
+    <li>&#8899;<sub>i</sub> R<sub>i</sub> = &Omega; &ndash; every pixel is assigned to some region;</li>
+    <li>R<sub>i</sub> &cap; R<sub>j</sub> = &empty; for i &ne; j &ndash; regions do not overlap;</li>
+    <li>each R<sub>i</sub> is a <i>connected</i> set under the chosen connectivity (4- or
+    8-neighbour adjacency &ndash; Figure 15);</li>
+    <li>H(R<sub>i</sub>) = TRUE for every i &ndash; each region individually satisfies a
+    <b>homogeneity predicate</b> H;</li>
+    <li>H(R<sub>i</sub> &cup; R<sub>j</sub>) = FALSE for every pair of <i>adjacent</i> regions
+    R<sub>i</sub>, R<sub>j</sub> &ndash; the partition is <i>maximal</i>: no two adjacent regions
+    could be merged without breaking homogeneity.</li>
+  </ol>
+  <p><b>Region growing</b> (Algorithm A) builds a single region bottom-up, pixel by pixel, from a
+  seed p&#8320;, testing condition 4 <i>incrementally</i> as each candidate pixel is considered,
+  rather than evaluating it once over a final fixed pixel set (flowchart: Figure 14). <b>Region
+  splitting and merging</b> (Algorithm C) instead starts from the whole domain &Omega; (which
+  trivially satisfies conditions 1&ndash;3 but not condition 4) and works top-down then
+  bottom-up: <code>SPLIT</code> enforces condition 4 by recursively quartering any block that
+  fails it (a quadtree &ndash; Figure 17), and <code>MERGE</code> enforces condition 5 by
+  recombining adjacent leaves whose union would still be homogeneous (Figure 18).</p>
+
+  <h4 class="sub">The homogeneity predicate and quadtree splitting</h4>
+  <p>For splitting, H is implemented as a simple intensity-range test on a block B:
+  H(B) &equiv; max<sub>p&isin;B</sub> I(p) &minus; min<sub>p&isin;B</sub> I(p) &le; &Theta;
+  (<code>_homogeneous</code> in <code>src/region_growing.py</code>), with &Theta; the same
+  <code>homogeneity_threshold</code> used for both splitting and (by default) merging. For region
+  growing there is no single H(R) evaluated over the whole region after the fact; growth is
+  governed by a <i>per-pixel</i> similarity criterion applied as each candidate is examined &ndash;
+  a stronger, order-sensitive proxy for the same idea, detailed next.</p>
+
+  <h4 class="sub">The similarity criterion: fixed seed vs. running mean</h4>
+  <p>Two different rules exist for deciding whether a candidate pixel q, adjacent to an
+  already-absorbed pixel p, should join the growing region R:</p>
+  <ul>
+    <li><b>Fixed-seed variant</b>: admit q iff |I(q) &minus; I(seed)| &le; T. The comparison
+    target is fixed at I(seed) for the entire run &ndash; every decision is independent of
+    everything the region has grown into so far.</li>
+    <li><b>Running-mean variant</b> (implemented here as the default,
+    <code>region_grow(..., update_mean=True)</code> &ndash; the assignment's "update the region
+    mean if required"): admit q iff |I(q) &minus; &mu;<sub>R</sub>| &le; T, where
+    &mu;<sub>R</sub> = (1/|R|)&sum;<sub>r&isin;R</sub> I(r) is <i>recomputed after every
+    admission</i>. &mu;<sub>R</sub> starts at I(seed) (when |R|=1) and drifts as brighter or
+    darker pixels are absorbed.</li>
+  </ul>
+  <p><code>src/region_growing.py</code>'s <code>region_grow</code> implements the running-mean
+  variant by default and exposes <code>update_mean=False</code> only as the fixed-seed
+  alternative; every measured result in this report (Figures 4/7/10, the threshold-metrics table,
+  and the 4- vs 8-connectivity comparison in Figures 5/8/11) uses the running-mean variant.</p>
+  <p class="note"><b>Why this is the report's most interesting technical point.</b> The running
+  mean makes admission <i>order-dependent</i>. Whether a given candidate q is admitted depends not
+  just on I(q) and T but on &mu;<sub>R</sub>'s value at the exact moment q is tested &ndash; and
+  that value depends on the precise sequence in which earlier pixels were popped from the BFS
+  stack and absorbed. Two BFS traversals that eventually visit the <i>same</i> pixel set in a
+  <i>different order</i> can therefore make a <i>different</i> admit/reject decision for the same
+  borderline pixel, purely because &mu;<sub>R</sub> has drifted to a different value by the time
+  each traversal reaches it. This is exactly the mechanism behind the measured 4- vs
+  8-connectivity <i>non-superset</i> result (Output &ndash; "4- vs 8-connected comparison" table):
+  8-connectivity's BFS visits diagonal neighbours the 4-connected traversal never considers, which
+  changes the order pixels enter the running sum, which shifts &mu;<sub>R</sub>'s trajectory
+  earlier. On <code>good_lighting</code> this measurably flips 72 pixels from admitted
+  (4-connected) to rejected (8-connected) even though those 72 pixels are themselves reachable via
+  plain orthogonal steps both traversals share &ndash; they are excluded from the 8-connected run
+  purely because its already-shifted running mean fails the |I(q)&minus;&mu;<sub>R</sub>|&le;T
+  test for them by the time it is their turn, not because 8-connectivity could not reach them. A
+  fixed-seed criterion could never produce this asymmetry: since I(seed) never changes,
+  8-connectivity is <i>guaranteed</i> to be a pixel-for-pixel superset of 4-connectivity under it
+  (extra diagonal paths can only add reachable pixels, never revoke a decision already fixed by a
+  constant reference value). The running mean trades that clean guarantee for a region estimate
+  that adapts to what has actually been absorbed so far &ndash; generally desirable, since a fixed
+  seed value is a single noisy sample while the running mean is a self-correcting estimate of
+  "typical pupil intensity so far" &ndash; but it is the direct, provable cause of the measured
+  non-superset behaviour, not an implementation bug.</p>
+
+  <h4 class="sub">Pseudocode: region growing (BFS)</h4>
+<pre> 1  procedure REGION_GROW(I, seed, T, N)        # N = 4- or 8-neighbour offset set
+ 2      visited[seed] &larr; true;  mask[seed] &larr; 255
+ 3      sum &larr; I[seed];  count &larr; 1;  &mu; &larr; sum / count
+ 4      push(S, seed)
+ 5      while S not empty do
+ 6          p &larr; pop(S)
+ 7          for each q in N(p) do
+ 8              if not visited[q] then
+ 9                  visited[q] &larr; true
+10                  if |I[q] &minus; &mu;| &le; T then
+11                      mask[q] &larr; 255
+12                      sum &larr; sum + I[q];  count &larr; count + 1
+13                      &mu; &larr; sum / count          # running-mean update, every admission
+14                      push(S, q)
+15  return mask, count</pre>
+
+  <h4 class="sub">Pseudocode: quadtree splitting</h4>
+<pre> 1  procedure SPLIT(I, r0, r1, c0, c1, minSize, &Theta;, leaves)
+ 2      B &larr; I[r0:r1, c0:c1]
+ 3      if (r1&minus;r0) &le; minSize or (c1&minus;c0) &le; minSize or HOMOGENEOUS(B, &Theta;) then
+ 4          leaves &larr; leaves &cup; {(r0,r1,c0,c1)}
+ 5          return
+ 6      rm &larr; r0 + (r1&minus;r0)/2;  cm &larr; c0 + (c1&minus;c0)/2
+ 7      SPLIT(I, r0, rm, c0, cm, minSize, &Theta;, leaves)     # top-left
+ 8      SPLIT(I, r0, rm, cm, c1, minSize, &Theta;, leaves)     # top-right
+ 9      SPLIT(I, rm, r1, c0, cm, minSize, &Theta;, leaves)     # bottom-left
+10      SPLIT(I, rm, r1, cm, c1, minSize, &Theta;, leaves)     # bottom-right
+11
+12  function HOMOGENEOUS(B, &Theta;)
+13      return max(B) &minus; min(B) &le; &Theta;</pre>
+
+  <h4 class="sub">Pseudocode: region merging (union-find)</h4>
+<pre> 1  procedure MERGE(leaves, &tau;)                    # &tau; = merge_tolerance
+ 2      for i &larr; 1 to L do parent[i] &larr; i        # union-find init, one leaf per set
+ 3      &mu;<sub>i</sub> &larr; mean(leaves[i])  for every i
+ 4      for i &larr; 1 to L do
+ 5          for j &larr; i+1 to L do
+ 6              if ADJACENT(leaves[i], leaves[j]) and |&mu;<sub>i</sub> &minus; &mu;<sub>j</sub>| &le; &tau; then
+ 7                  UNION(parent, i, j)
+ 8      for i &larr; 1 to L do
+ 9          labels[leaves[i]] &larr; FIND(parent, i)
+10  return labels
+11
+12  function FIND(parent, x)                     # path compression
+13      while parent[x] &ne; x do
+14          parent[x] &larr; parent[parent[x]]
+15          x &larr; parent[x]
+16      return x
+17
+18  procedure UNION(parent, x, y)
+19      rx &larr; FIND(parent, x);  ry &larr; FIND(parent, y)
+20      if rx &ne; ry then parent[rx] &larr; ry</pre>
+
+  <h4 class="sub">Complexity analysis</h4>
+  <p><b>Region growing (A).</b> Every pixel is pushed onto the stack at most once, guarded by the
+  <code>visited</code> array set the first time it is examined as a neighbour (pseudocode lines
+  8&ndash;9), so the outer loop body runs O(N) times for an N-pixel image. Each popped pixel
+  performs a constant number of neighbour tests (4 or 8), each O(1) &ndash; a comparison, at most
+  one array write, and an O(1) incremental mean update. <b>Total time O(N); space O(N)</b> for
+  the visited/mask arrays plus O(N) worst case for the stack.</p>
+  <p><b>Quadtree splitting (C, SPLIT).</b> At each recursion depth d, the current set of blocks
+  exactly partitions the image, so the pixels examined by the homogeneity test (a max/min scan)
+  summed across all blocks at that depth is O(N), regardless of block count. The recursion halves
+  each block's side length per level, reaching the <code>min_size</code> floor after O(log N)
+  levels. <b>Total time O(N log N); space O(N)</b> for leaves plus O(log N) recursion depth.</p>
+  <p><b>Merging (C, MERGE).</b> With L leaves, the union-find operations themselves (FIND with
+  path compression, UNION) are O(&alpha;(L)) amortized per call &ndash; effectively linear, i.e.
+  <b>O(L&alpha;(L))</b> total for the unions actually performed. As implemented, however, the
+  adjacency test that decides <i>which pairs to attempt</i> is a plain nested loop over all leaf
+  pairs (pseudocode lines 4&ndash;7): O(L&sup2;) pair tests, each O(1). Since L is a few hundred
+  here (Output &ndash; "Split-merge" table) against N in the tens of thousands, O(L&sup2;) stays
+  fast in absolute terms (L&sup2;&asymp;62,500 for L=250) &ndash; but the O(L&alpha;(L)) bound is
+  precisely for the union-find machinery, not the adjacency-pair enumeration wrapped around it; a
+  spatially-indexed adjacency lookup would bring the whole merge step down to O(L log L) or
+  better, and matters more as <code>min_size</code> shrinks and L grows (Limitations &amp; Future
+  Work).</p>
+  <p><b>Relating this to the measured timings.</b> Both connectivity variants of
+  <code>region_grow</code> are the <i>same</i> O(N) algorithm; the constant factor differs only
+  because 8-connectivity performs exactly twice as many neighbour tests per popped pixel (8 vs 4).
+  The measured ratio (5.68/3.90 &asymp; 1.45&times;, Output &ndash; "4- vs 8-connected" table) is
+  well under the naive 2&times; that test count alone would predict &ndash; explained next.</p>
+
+  <h4 class="sub">Why 8-connectivity costs 1.45&times;, not 2&times;</h4>
+  <p>Doubling the neighbour-test count per popped pixel does not double wall-clock time, for two
+  compounding reasons visible in this implementation:</p>
+  <ol>
+    <li><b>Fixed per-pixel overhead.</b> Popping from the deque, writing to
+    <code>visited</code>/<code>mask</code>, and recomputing the running mean happen once per
+    popped pixel <i>regardless</i> of connectivity &ndash; this fixed cost does not scale with
+    neighbour count, diluting the 2&times; variable cost toward a smaller overall ratio.</li>
+    <li><b>Memory locality and early rejection.</b> The four extra diagonal offsets
+    ((&minus;1,&minus;1), (&minus;1,+1), (+1,&minus;1), (+1,+1)) address pixels in the row
+    immediately above/below the current row, already resident in cache from processing that row's
+    orthogonal neighbours moments earlier &ndash; so the "extra" lookups mostly hit warm cache
+    lines rather than causing additional misses, and any candidate that has already been absorbed
+    via a cheaper orthogonal path short-circuits at the <code>visited</code> check before the
+    |I(q)&minus;&mu;<sub>R</sub>|&le;T test ever runs.</li>
+  </ol>
+  <p>The net effect measured here (1.42&times;&ndash;1.47&times; across the 3 images, mean
+  1.45&times;, Output &ndash; "4- vs 8-connected" table) sits well below the naive 2&times;
+  prediction from raw test count alone.</p>
+
+  </td></tr>
+</table>
+
 <table class="t3-row compact"><colgroup><col class="lbl"><col></colgroup>
   <tr><td class="label">Resources / Apparatus Required</td><td>
     Software: Python 3.11 &bull; OpenCV &bull; NumPy &bull; Matplotlib &bull; scikit-image &bull;
@@ -211,6 +400,10 @@
     merging.</li>
     <li>Stop the program.</li>
   </ol>
+
+  <p class="note">Formal, line-numbered pseudocode for all three procedures above, a flowchart
+  (Figure 14) for Algorithm A, and a full time/space complexity analysis are given in
+  <b>Theory &amp; Formal Background</b> above.</p>
 
   </td></tr>
 </table>
@@ -363,6 +556,59 @@ def split_merge(img, min_size=20, homogeneity_threshold=25, merge_tolerance=None
     <figcaption>Figure 13: Region size (% of image) vs. threshold, all 3 images.</figcaption>
   </figure>
 
+  <h4 class="sub">Explanatory diagrams (Figures 14&ndash;20)</h4>
+  <p>The 13 figures above report <i>measured</i> results. The 7 figures below are explanatory
+  diagrams supporting the formal treatment in Theory &amp; Formal Background and the failure-mode
+  analysis in Analysis &amp; Discussion &ndash; schematics and a flowchart for the algorithms
+  themselves, plus a scanline diagnostic built from the same 3 dataset images.</p>
+
+  <figure>
+    <img src="../results/task7_diag_flowchart.png" alt="Region growing flowchart">
+    <figcaption>Figure 14: Region-growing flowchart (Algorithm A) &ndash; BFS from seed p0,
+    admitting neighbour q when |I(q) &minus; &mu;<sub>R</sub>| &le; T, with &mu;<sub>R</sub> the
+    running region mean updated after every admission. Compare against the pseudocode in Theory
+    &amp; Formal Background.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_diag_connectivity.png" alt="4- vs 8-connectivity neighbourhood diagram">
+    <figcaption>Figure 15: 4-connected vs. 8-connected pixel-neighbourhood definitions used by
+    <code>region_grow(..., connectivity=4|8)</code>, with each cell's (&Delta;row,&Delta;col)
+    offset from the centre pixel p labelled.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_diag_progression.png" alt="Region growing progression">
+    <figcaption>Figure 16: Region-growing progression on <code>good_lighting</code> (auto seed,
+    T=45/High) &ndash; the frontier expands outward from the seed one BFS layer at a time, shown
+    at 2%, 10%, 30%, 60% and 100% of the final region size.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_diag_quadtree.png" alt="Quadtree splitting diagram">
+    <figcaption>Figure 17: Quadtree splitting (Algorithm C, SPLIT) on a schematic 32x32
+    image &ndash; recursive quadrant boundaries (left) and the corresponding recursion tree
+    (right), annotated with each node's mean, intensity range, and the reason it became a leaf
+    ("homogeneous" vs. "size floor").</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_diag_rag.png" alt="Region adjacency graph and merge criterion">
+    <figcaption>Figure 18: Region adjacency graph and the merge criterion (Algorithm C, MERGE) on
+    a schematic 4-cluster image &ndash; nodes are quadtree leaves coloured by their final merged
+    region id, edges are leaf adjacency annotated with |&mu;<sub>i</sub> &minus; &mu;<sub>j</sub>|,
+    solid green where that difference is within the merge tolerance (merge) and dashed red where
+    it is not (kept separate).</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_diag_intensity_profile.png" alt="Intensity profile with threshold acceptance bands">
+    <figcaption>Figure 19: Horizontal intensity scanline through the seed pixel, <code>poor_lighting</code>
+    vs. <code>glasses_reflection</code>, with illustrative T=10/25/45/60 acceptance bands shaded
+    around the seed value. Referenced throughout the failure-mode analysis below.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/task7_diag_pipeline.png" alt="Pipeline block diagram">
+    <figcaption>Figure 20: Where region growing and split-merge sit in the overall driver-drowsiness
+    pipeline &ndash; acquisition &rarr; enhancement (Task 3) &rarr; filtering (Task 4) &rarr;
+    segmentation (Task 6/7) &rarr; feature extraction &rarr; drowsiness decision.</figcaption>
+  </figure>
+
   <h4 class="sub">Threshold effect (region size, missing pixels, leakage, segmentation accuracy)</h4>
   <p class="note">"Missing pixels" / "leakage" / "segmentation accuracy" are measured against a
   reference pupil mask reused as-is from <code>src.segment.segment_eye</code> (Otsu value scaled
@@ -412,6 +658,138 @@ def split_merge(img, min_size=20, homogeneity_threshold=25, merge_tolerance=None
     <tr><td>poor_lighting</td><td>250</td><td>37</td><td>6.8x</td></tr>
     <tr><td>glasses_reflection</td><td>256</td><td>47</td><td>5.4x</td></tr>
   </table>
+
+  </td></tr>
+</table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Analysis &amp; Discussion</td><td>
+
+  <p>The measured trends in Output follow directly from the mechanisms formalised in Theory &amp;
+  Formal Background. Region size grows with T because a larger T widens the running-mean
+  acceptance window, and the growth is non-linear because that window's effect compounds with the
+  region's own shape: while the frontier is still inside the dark, fairly uniform pupil core
+  (visible as the tight red patches in Figure 16's early snapshots), &mu;<sub>R</sub> barely moves
+  and growth is slow; once the frontier reaches a boundary the current T can cross, growth
+  accelerates sharply (Figure 16's 60%&rarr;100% panels) &ndash; this is the same mechanism as the
+  Medium&rarr;High jump documented for <code>poor_lighting</code> in Observations below. The 4- vs
+  8-connectivity divergence is a direct, provable consequence of the running-mean criterion being
+  order-dependent (Theory &amp; Formal Background &ndash; "The similarity criterion"), not
+  measurement noise. Split-merge's very different leaf-reduction ratios across the 3 images
+  (19.2x on <code>good_lighting</code> vs. 5.4x on <code>glasses_reflection</code>) reflect how
+  many genuinely distinct intensity plateaus each image's illumination pattern creates for the
+  quadtree's homogeneity test to separate &ndash; Figure 17 shows the same mechanism in miniature
+  on a controlled schematic image, where only the quadrants that straddle a real boundary need to
+  recurse past depth 1.</p>
+
+  <h4 class="sub">Failure-mode analysis</h4>
+  <p><b>Why <code>poor_lighting</code> leaks at T=60.</b> Figure 19 (left panel) plots the
+  intensity scanline through this image's seed row. The pupil-to-eyelid-crease transition is a
+  <i>long, shallow ramp</i>: the profile stays inside even the widest shaded band (T=60) across a
+  wide run of columns either side of the seed, rather than crossing it in a sharp jump. Because
+  the running mean &mu;<sub>R</sub> only ever moves gradually, one admitted pixel at a time
+  (Theory &amp; Formal Background), once growth reaches this ramp it keeps admitting the next,
+  only-slightly-brighter ring of pixels, walking &mu;<sub>R</sub> upward step by step rather than
+  being stopped by any single sharp intensity jump. This is exactly the leakage measured in the
+  threshold-metrics table: missing pixels keep falling (750&rarr;21px) but leakage jumps from 0 to
+  4,275px between High and Very High, which is also why IoU peaks at High (0.937) and falls back
+  at Very High (0.734) for this image alone &ndash; the ramp both Figure 19 and this leakage number
+  describe is the same physical feature.</p>
+  <p><b>Why <code>glasses_reflection</code> never leaks.</b> Figure 19 (right panel) shows the
+  opposite profile shape for the same seed-row scanline: an abrupt, large jump at the IR glare
+  boundary &ndash; the profile leaves every shaded band within a handful of columns rather than
+  drifting through them. No matter how far &mu;<sub>R</sub> has drifted by the time growth reaches
+  that edge, the intensity jump there is far larger than any tested T (up to 60), so the boundary
+  acts as a hard stopping edge the running-mean criterion cannot cross in either direction &ndash;
+  consistent with the measured 0px leakage at <i>every</i> tested threshold including Very High
+  (threshold-metrics table) and visually with Figure 10/11's mask hugging the eyelid contour rather
+  than spilling past the glare.</p>
+
+  <h4 class="sub">Application relevance</h4>
+  <p>A correctly segmented pupil region is not an end in itself here &ndash; it is the direct
+  input to the geometric features (<code>src/features.py</code>, <code>src/perclos.py</code>) that
+  PERCLOS-style drowsiness detection consumes downstream (Figure 20): pupil/eye-opening area, and,
+  via a fitted ellipse or bounding box, an aperture proxy, computed frame by frame. A shrinking or
+  vanishing measured area is the actual signal a PERCLOS-style detector watches for eye closure.
+  Leakage at the segmentation stage corrupts this signal in a specific, predictable direction:
+  because leakage only ever <i>grows</i> the measured region (no threshold-metrics row shows
+  negative leakage), an eye that is not actually more open would be scored as if it were, biasing
+  the downstream openness proxy upward and <i>delaying</i> detection of a closing eye &ndash;
+  exactly the failure mode that matters most for a drowsiness detector, where a late detection is
+  the costly error. This is why this report tracks leakage onset as carefully as raw region size:
+  for this application, a slightly under-grown but leakage-free region
+  (<code>good_lighting</code> at High, T=45: IoU 0.785, 0 leakage) is arguably a <i>safer</i>
+  operating point than a larger but leaking one, even though the larger region's raw IoU against
+  the static reference mask is nominally higher (Very High: IoU 0.869, 2,863px leakage) &ndash;
+  accuracy against a static reference mask and safety for a temporal drowsiness signal are not the
+  same criterion.</p>
+
+  </td></tr>
+</table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Comparison with Other Segmentation Techniques</td><td>
+
+  <p>Task 6 evaluated Otsu global thresholding, adaptive thresholding, and Sobel/Laplacian edge
+  operators on the same 3 dataset images. The table below compares all of Task 6's methods against
+  this task's two region-based techniques along the dimensions most relevant to segmenting a
+  pupil under variable IR illumination.</p>
+
+  <table class="data wide7">
+    <colgroup><col style="width:17%"><col style="width:21%"><col style="width:21%"><col style="width:21%"><col style="width:20%"></colgroup>
+    <tr><th>Method</th><th>Seed dependence</th><th>Parameter sensitivity</th><th>Connectivity awareness</th><th>Non-uniform illumination handling</th></tr>
+    <tr class="winner"><td>Region growing (this task)</td>
+      <td>High &ndash; anchored to one starting pixel; auto darkest-point seeding mitigates but
+      does not remove this (manual seed at intensity 54 on <code>poor_lighting</code> gave a
+      &gt;5x larger Medium-T region, Observations).</td>
+      <td>High &ndash; a single global T controls both reach and leakage onset
+      (3,961&rarr;24,750px across T=10&rarr;60 on <code>good_lighting</code>).</td>
+      <td>Explicit and tunable (4 vs. 8, Figure 15) &ndash; the only method here where
+      connectivity is itself a first-class parameter.</td>
+      <td>Adapts locally via the running mean (Theory &amp; Formal Background), tracking a
+      spatially-varying pupil intensity better than a single global cutoff &ndash; but the same
+      adaptivity is what lets it drift and leak once a boundary is only a shallow gradient away
+      (Failure-mode analysis above).</td></tr>
+    <tr><td>Region split-merge (this task)</td>
+      <td>None &ndash; starts from the whole frame, no seed pixel.</td>
+      <td>High &ndash; the homogeneity/merge tolerance controls both leaf count and final region
+      count (250&ndash;256 leaves collapsing 5.4x&ndash;19.2x, Output).</td>
+      <td>Implicit only &ndash; quadtree leaves are always axis-aligned rectangles; merge
+      adjacency is edge-touching, not pixel-level 4-/8-connectivity.</td>
+      <td>Locally adaptive per block (each leaf's homogeneity is tested independently of the rest
+      of the image) but boundaries stay block-aligned regardless (Limitations &amp; Future
+      Work).</td></tr>
+    <tr><td>Otsu global threshold (Task 6)</td>
+      <td>None.</td>
+      <td>Low &ndash; the threshold is computed automatically from the histogram, no user
+      parameter to tune.</td>
+      <td>None at the thresholding step itself (a per-pixel binary decision); any connectivity
+      enters only via a separate connected-component pass afterward.</td>
+      <td>Poor &ndash; a single global threshold cannot track spatially-varying illumination;
+      Task 6 documents this as a source of eyebrow/eyelash inclusion in the same Otsu-anchored
+      mask this report reuses as its own reference.</td></tr>
+    <tr><td>Adaptive threshold (Task 6)</td>
+      <td>None.</td>
+      <td>Moderate &ndash; block size and constant offset must both be chosen.</td>
+      <td>None at the thresholding step.</td>
+      <td>Good by design &ndash; the whole point of a locally-computed threshold (mean/Gaussian
+      neighbourhood) is to track slow illumination gradients that defeat a single global Otsu
+      value.</td></tr>
+    <tr><td>Edge operators &ndash; Sobel/Laplacian (Task 6)</td>
+      <td>None.</td>
+      <td>Moderate-high &ndash; kernel size and the post-hoc binarization threshold on gradient
+      magnitude both matter.</td>
+      <td>None directly &ndash; edge maps mark boundaries, not regions; turning them into a region
+      needs a separate closing/filling step.</td>
+      <td>Poor to moderate &ndash; gradient magnitude responds to any local contrast change,
+      including illumination gradients unrelated to the pupil boundary, producing spurious
+      edges.</td></tr>
+  </table>
+  <p class="note">Region growing is the only method in this comparison where connectivity is a
+  tunable, first-class parameter (Figure 15) rather than an afterthought applied to someone else's
+  binary mask &ndash; but that same design choice (a running-mean criterion evaluated pixel by
+  pixel) is what makes it seed- and threshold-sensitive in a way Otsu and adaptive thresholding,
+  which have no seed at all, structurally cannot be.</p>
 
   </td></tr>
 </table>
@@ -490,6 +868,39 @@ def split_merge(img, min_size=20, homogeneity_threshold=25, merge_tolerance=None
 </table>
 
 <table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
+  <tr><td class="label">Limitations &amp; Future Work</td><td>
+  <ul>
+    <li><b>Seed sensitivity.</b> Automatic darkest-point seeding is reliable on all 3 test images
+    here, but remains a single-pixel decision with no fallback. The manual centred seed on
+    <code>poor_lighting</code> (intensity 54, Seeds table) sat outside the pupil and produced a
+    Medium-threshold region over 5x larger than the correctly-seeded auto run (7,002px vs.
+    1,352px, Observations) purely because it started from a much brighter running mean &ndash; a
+    single bad seed silently produces a badly wrong region with no signal in the output that
+    anything went wrong. <i>Future work</i>: seed validation (e.g. reject seeds far from the
+    image's own darkest-percentile pixels) or multi-seed voting.</li>
+    <li><b>No sub-pixel boundary.</b> Every region boundary here is a set of whole pixels &ndash;
+    a pixel is either in the mask or not, with no partial-membership or sub-pixel edge estimate
+    &ndash; so reported areas carry an inherent boundary-perimeter quantization error that matters
+    more for a small pupil than a large one.</li>
+    <li><b>Fixed global T.</b> A single threshold is applied uniformly across the whole image
+    regardless of local contrast &ndash; unlike Task 6's adaptive threshold, which recomputes its
+    cutoff per neighbourhood specifically to handle this (Comparison table above). <i>Future
+    work</i>: a locally-scaled T, e.g. proportional to a local contrast estimate around the
+    current frontier.</li>
+    <li><b>Blocky, quadtree-aligned boundaries.</b> <code>split_merge</code>'s regions are unions
+    of axis-aligned rectangular leaves (Figures 6/9/12), so even after merging, region boundaries
+    are staircase-shaped along the leaf grid rather than following the pupil/iris's typically
+    curved true boundary &ndash; visible directly in the merged-region colour maps.</li>
+    <li><b>Merge scalability.</b> The implemented adjacency test in <code>MERGE</code> is
+    O(L&sup2;) in the leaf count L (Theory &amp; Formal Background &ndash; Complexity analysis);
+    a smaller <code>min_size</code> (finer quadtree, better boundary fidelity) would grow L and
+    make this the dominant cost. <i>Future work</i>: a spatially-indexed adjacency query in place
+    of the pairwise scan.</li>
+  </ul>
+  </td></tr>
+</table>
+
+<table class="t3-row"><colgroup><col class="lbl"><col></colgroup>
   <tr><td class="label">Conclusion</td><td>
   <p>
   Seeded region growing with a continuously-updated region mean was implemented in
@@ -513,7 +924,14 @@ def split_merge(img, min_size=20, homogeneity_threshold=25, merge_tolerance=None
   whose glare/reflection/eyelid-crease intensity landscape resists merging into large uniform
   regions. All quantitative claims in this report are grounded in the measured CSVs
   (<code>results/task7_threshold_metrics.csv</code>, <code>results/task7_connectivity_metrics.csv</code>,
-  <code>results/task7_splitmerge_metrics.csv</code>), not visual impression alone.
+  <code>results/task7_splitmerge_metrics.csv</code>), not visual impression alone. The formal
+  treatment in Theory &amp; Formal Background traces the 4- vs 8-connectivity non-superset result
+  to a specific, provable cause &ndash; the running-mean similarity criterion's order-dependence
+  &ndash; rather than leaving it as an unexplained empirical curiosity, and the failure-mode
+  analysis in Analysis &amp; Discussion grounds both the <code>poor_lighting</code> leak at T=60
+  and the absence of any leak on <code>glasses_reflection</code> in the same intensity-profile
+  mechanism (Figure 19): a shallow gradient the running mean can climb versus a hard barrier it
+  cannot cross.
   </p>
   </td></tr>
 </table>
