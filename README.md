@@ -43,12 +43,13 @@ split was evaluated once, at the end.
 ## Repository layout
 
 ```
+submissions/  every graded PDF — all task reports and the poster
 src/          pipeline modules (preprocess, enhancement, spatial_filtering,
               segment, morphology, transforms, features, classify,
               detect, ear, perclos, compression)
 scripts/      dataset build, feature build, demo app, PDF renderers
 notebooks/    01-09, executed with outputs
-docs/         per-week reports, proposal, task reports (PDF)
+docs/         per-week write-ups and the HTML sources for each report
 data/samples/ 40 curated MRL images + provenance manifest
 models/       trained eye-state classifier (26.8 MB)
 assets/       Haar cascades + MediaPipe face landmarker
@@ -80,7 +81,7 @@ Interactive enhancement menu:
 
 | Week | Topic | Report |
 |---|---|---|
-| 1 | Proposal, dataset | [proposal](docs/proposal/DIP_Proposal_Drowsiness_Detection.pdf) |
+| 1 | Proposal, dataset | [proposal](submissions/Task1_Project_Proposal.pdf) |
 | 2 | Enhancement | [week2](docs/week2_enhancement.md) |
 | 3 | Segmentation | [week3](docs/week3_segmentation.md) |
 | 4 | Morphology | [week4](docs/week4_morphology.md) |
@@ -89,8 +90,18 @@ Interactive enhancement menu:
 | 7 | Live inference, PERCLOS | [week7](docs/week7_live_inference.md) |
 | 8 | Compression | [week8](docs/week8_compression.md) |
 
-Lab task reports: [Task 3 — enhancement](docs/task3_report.pdf),
-[Task 4 — spatial filtering](docs/task4_report.pdf).
+## Submissions
+
+Every graded PDF lives in **[`submissions/`](submissions/)**:
+
+| # | Deliverable | File |
+|---|---|---|
+| Task 1 | Project proposal | [Task1_Project_Proposal.pdf](submissions/Task1_Project_Proposal.pdf) |
+| Task 3 | Image enhancement | [Task3_Image_Enhancement.pdf](submissions/Task3_Image_Enhancement.pdf) |
+| Task 4 | Spatial filtering | [Task4_Spatial_Filtering.pdf](submissions/Task4_Spatial_Filtering.pdf) |
+| Task 6 | Segmentation | [Task6_Segmentation.pdf](submissions/Task6_Segmentation.pdf) |
+| Task 7 | Region growing | [Task7_Region_Growing.pdf](submissions/Task7_Region_Growing.pdf) |
+| — | Project poster | [Project_Poster.pdf](submissions/Project_Poster.pdf) |
 
 ## Findings worth noting
 

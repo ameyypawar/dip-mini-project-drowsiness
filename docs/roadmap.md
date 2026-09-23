@@ -15,11 +15,18 @@ All eight weeks complete. Maps the five mandated DIP topics onto weekly delivera
 
 ## Lab task submissions
 
+All graded PDFs are in `submissions/`.
+
 | Task | Topic | Report |
 |---|---|---|
-| 1 | Proposal | `docs/proposal/DIP_Proposal_Drowsiness_Detection.pdf` |
-| 3 | Image enhancement (spatial domain) | `docs/task3_report.pdf` |
-| 4 | Spatial filtering — smoothing & sharpening | `docs/task4_report.pdf` |
+| 1 | Proposal | `submissions/Task1_Project_Proposal.pdf` |
+| 3 | Image enhancement (spatial domain) | `submissions/Task3_Image_Enhancement.pdf` |
+| 4 | Spatial filtering — smoothing & sharpening | `submissions/Task4_Spatial_Filtering.pdf` |
+| 6 | Segmentation — edge detection & thresholding | `submissions/Task6_Segmentation.pdf` |
+| 7 | Region growing, connectivity, split & merge | `submissions/Task7_Region_Growing.pdf` |
+| — | Project poster (A4) | `submissions/Project_Poster.pdf` |
+
+Tasks 2 and 5 were not completed.
 
 ## Topic-to-week cross-check
 

@@ -7,7 +7,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HTML_PATH="${ROOT_DIR}/docs/task6_report.html"
-PDF_PATH="${ROOT_DIR}/docs/task6_report.pdf"
+PDF_PATH="${ROOT_DIR}/submissions/Task6_Segmentation.pdf"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 render() {

@@ -7,7 +7,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HTML_PATH="${ROOT_DIR}/docs/proposal/proposal.html"
-PDF_PATH="${ROOT_DIR}/docs/proposal/DIP_Proposal_Drowsiness_Detection.pdf"
+PDF_PATH="${ROOT_DIR}/submissions/Task1_Project_Proposal.pdf"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 MAX_PAGES=2
 
