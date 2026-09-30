@@ -1,0 +1,4 @@
+image,size,seed,region_grow_T,region_pixels,otsu_on_segmented
+good_lighting,256x256,"123,114",45,17523,80.0
+poor_lighting,260x260,"133,106",45,11130,88.0
+glasses_reflection,288x288,"152,143",45,12683,62.0

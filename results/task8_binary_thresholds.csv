@@ -1,0 +1,10 @@
+image,threshold,fg_pixels,area_fraction,pct_change,components,boundary_len,small_comps_le30
+good_lighting,40,10100,0.15411,0.0,2,672,0
+good_lighting,60,14784,0.22559,0.0,2,962,1
+good_lighting,100,17523,0.26738,0.0,1,1224,0
+poor_lighting,40,4528,0.06698,0.0,8,773,6
+poor_lighting,60,7160,0.10592,0.0,17,1417,14
+poor_lighting,100,11130,0.16464,0.0,1,1467,0
+glasses_reflection,40,9024,0.1088,0.0,1,533,0
+glasses_reflection,60,11760,0.14178,0.0,2,612,0
+glasses_reflection,100,12683,0.15291,0.0,1,695,0

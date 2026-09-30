@@ -1,0 +1,10 @@
+image,se,components0,erosion_all_vanish_iter,erosion_component_vanish_iters,dilation_first_merge_iter,dilation_single_component_iter
+good_lighting,square3,2,27,1/27,1,1
+good_lighting,cross3,2,37,1/37,1,1
+good_lighting,square5,2,14,1/14,1,1
+poor_lighting,square3,17,12,1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/2/12,1,4
+poor_lighting,cross3,17,16,1/1/1/1/1/1/1/1/1/1/1/1/1/2/2/3/16,1,5
+poor_lighting,square5,17,6,1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/6,1,2
+glasses_reflection,square3,2,29,2/29,1,1
+glasses_reflection,cross3,2,34,3/34,2,2
+glasses_reflection,square5,2,15,1/15,1,1

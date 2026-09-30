@@ -1,0 +1,4 @@
+image,fg_pixels,area_fraction,pct_change,components,boundary_len
+good_lighting,14784,0.22559,0.0,2,962
+poor_lighting,7160,0.10592,0.0,17,1417
+glasses_reflection,11760,0.14178,0.0,2,612

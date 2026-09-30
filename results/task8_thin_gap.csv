@@ -1,0 +1,10 @@
+image,se,thin_pixels_A_minus_open,gap_pixels_close_minus_A
+good_lighting,square3,52,36
+good_lighting,cross3,130,127
+good_lighting,square5,136,108
+poor_lighting,square3,512,448
+poor_lighting,cross3,428,419
+poor_lighting,square5,952,872
+glasses_reflection,square3,16,20
+glasses_reflection,cross3,84,86
+glasses_reflection,square5,104,96

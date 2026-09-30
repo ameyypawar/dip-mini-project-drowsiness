@@ -103,6 +103,7 @@ Every graded PDF lives in **[`submissions/`](submissions/)**:
 | Task 5 | Sharpening & integration | [Task5_Sharpening_Filters.pdf](submissions/Task5_Sharpening_Filters.pdf) |
 | Task 6 | Segmentation | [Task6_Segmentation.pdf](submissions/Task6_Segmentation.pdf) |
 | Task 7 | Region growing | [Task7_Region_Growing.pdf](submissions/Task7_Region_Growing.pdf) |
+| Task 8 | Binary morphology | [Task8_Morphological_Processing.pdf](submissions/Task8_Morphological_Processing.pdf) |
 | — | Project poster | [Project_Poster.pdf](submissions/Project_Poster.pdf) |
 
 ## Findings worth noting
