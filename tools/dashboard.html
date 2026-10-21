@@ -130,6 +130,8 @@ footer{padding-block:26px 40px;border-top:1px solid var(--line);
 .slider{display:flex;align-items:center;gap:9px}
 .slider input{accent-color:var(--amber);width:110px}
 .slider span{font-family:var(--mono);font-size:.7rem;color:var(--data);min-width:2.2em}
+button.camon{background:var(--amber);color:#16202b;border-color:var(--amber);font-weight:600}
+#camstat{font-family:var(--mono);font-size:.7rem;color:var(--muted);letter-spacing:.05em}
 @media(max-width:860px){.lanes{grid-template-columns:1fr 1fr 1fr}}
 @media(max-width:520px){.lanes{grid-template-columns:1fr 1fr}}
 
@@ -200,19 +202,24 @@ footer{padding-block:26px 40px;border-top:1px solid var(--line);
 
 
 <section>
-  <h2>Run it on your own image</h2>
-  <p class="lede" style="margin-top:8px">Drop in a photo and the six stages run in your browser,
-  on the real operators reimplemented in JavaScript. Nothing is uploaded anywhere.</p>
+  <h2>Try it live</h2>
+  <p class="lede" style="margin-top:8px">Point your webcam at your eye, or drop in a photo. The six
+  stages run in your browser on the real operators reimplemented in JavaScript. Nothing leaves this
+  machine.</p>
 
   <div class="ctrls" style="margin:16px 0 14px">
+    <button type="button" id="cam" class="camon">Start camera</button>
+    <button type="button" id="camoff" disabled>Stop</button>
     <button type="button" id="pick">Choose an image</button>
-    <button type="button" id="samp">Use a dataset sample</button>
+    <button type="button" id="samp">Dataset sample</button>
     <span class="slider"><label for="gm" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)">Gamma</label>
       <input id="gm" type="range" min="0.4" max="2.4" step="0.1" value="1.0"><span id="gmv">1.0</span></span>
+    <span id="camstat">idle</span>
     <span class="slider"><label for="mi" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)">Morph</label>
       <input id="mi" type="range" min="0" max="3" step="1" value="1"><span id="miv">1</span></span>
   </div>
   <input id="file" type="file" accept="image/*" hidden>
+  <video id="vid" playsinline muted style="display:none"></video>
 
   <div class="drop" id="drop">
     <p id="dropmsg">Drag an image here, or choose one above. A face or eye photo works best.</p>
@@ -230,11 +237,10 @@ footer{padding-block:26px 40px;border-top:1px solid var(--line);
   <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:18px">
     <div style="flex:1;min-width:260px;background:var(--panel);border:1px solid var(--line);
       border-left:3px solid var(--amber);border-radius:3px;padding:14px 16px">
-      <div style="font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin-bottom:6px">Live camera</div>
-      <p style="margin:0;color:var(--muted);font-size:.86rem">Browsers block camera access inside a
-      published page, so the webcam version runs locally. From the project folder:
-      <code style="font-family:var(--mono);font-size:.8rem;color:var(--data)">cd tools &amp;&amp; python3 -m http.server 8777</code>
-      then open <code style="font-family:var(--mono);font-size:.8rem;color:var(--data)">localhost:8777/live_pipeline.html</code>.</p>
+      <div style="font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin-bottom:6px">Reading the stages</div>
+      <p style="margin:0;color:var(--muted);font-size:.86rem">Watch the contrast figure jump between
+      grayscale and equalised, then watch the median filter pull the noise figure back down. Raise the
+      morphology slider and the segmented region loses its speckle.</p>
     </div>
     <div style="flex:1;min-width:260px;background:var(--panel);border:1px solid var(--line);
       border-left:3px solid var(--data);border-radius:3px;padding:14px 16px">
@@ -533,18 +539,55 @@ buildImgSel(); buildTrack(); render();
   const cx=[]; for(let i=0;i<6;i++){const c=$("k"+i); c.width=c.height=N; cx.push(c.getContext("2d",{willReadFrequently:true}));}
   const tmp=document.createElement("canvas"); tmp.width=tmp.height=N;
   const tctx=tmp.getContext("2d",{willReadFrequently:true});
-  let srcImg=null;
-  $("gm").addEventListener("input",e=>{$("gmv").textContent=(+e.target.value).toFixed(1); run();});
-  $("mi").addEventListener("input",e=>{$("miv").textContent=e.target.value; run();});
+  let srcImg=null, stream=null, raf=null, lastT=0, fps=0;
+  const vid=$("vid");
+  $("gm").addEventListener("input",e=>{$("gmv").textContent=(+e.target.value).toFixed(1); if(!stream) run();});
+  $("mi").addEventListener("input",e=>{$("miv").textContent=e.target.value; if(!stream) run();});
   $("pick").addEventListener("click",()=>$("file").click());
   $("file").addEventListener("change",e=>{ if(e.target.files[0]) load(e.target.files[0]); });
-  $("samp").addEventListener("click",()=>{ const im=new Image();
+  $("samp").addEventListener("click",()=>{ stopCam(); const im=new Image();
     im.onload=()=>{srcImg=im; $("dropmsg").textContent="Dataset sample loaded."; run();};
     im.src=A["closed_1raw"]; });
+
+  $("cam").addEventListener("click",async()=>{
+    $("camstat").textContent="requesting camera\u2026";
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({
+        video:{width:{ideal:640},height:{ideal:640},facingMode:"user"},audio:false});
+    }catch(err){
+      stream=null;
+      $("camstat").textContent="camera unavailable ("+err.name+")";
+      $("dropmsg").textContent="Camera blocked. Published pages cannot open a camera \u2014 "+
+        "run this file from http://localhost instead. Upload still works here.";
+      return;
+    }
+    vid.srcObject=stream; await vid.play();
+    $("cam").disabled=true; $("camoff").disabled=false;
+    $("camstat").textContent="live"; $("dropmsg").textContent="Camera running.";
+    lastT=performance.now(); loop();
+  });
+  $("camoff").addEventListener("click",stopCam);
+
+  function stopCam(){
+    if(raf){cancelAnimationFrame(raf); raf=null;}
+    if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null;}
+    $("cam").disabled=false; $("camoff").disabled=true;
+    if($("camstat").textContent==="live") $("camstat").textContent="stopped";
+  }
+  function loop(){
+    raf=requestAnimationFrame(loop);
+    if(!vid.videoWidth) return;
+    draw(vid, vid.videoWidth, vid.videoHeight);
+    const now=performance.now();
+    fps = fps ? fps*0.9 + (1000/(now-lastT))*0.1 : 1000/(now-lastT);
+    lastT=now; $("camstat").textContent="live \u00b7 "+fps.toFixed(0)+" fps";
+  }
+
   const dz=$("drop");
   ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("over");}));
   ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("over");}));
-  dz.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith("image/")) load(f); });
+  dz.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith("image/")){stopCam(); load(f);} });
+
   function load(file){
     const r=new FileReader();
     r.onload=()=>{ const im=new Image();
@@ -554,10 +597,11 @@ buildImgSel(); buildTrack(); render();
     r.onerror=()=>{$("dropmsg").textContent="That file could not be read.";};
     r.readAsDataURL(file);
   }
-  function run(){
-    if(!srcImg) return;
-    const s=Math.min(srcImg.width,srcImg.height);
-    tctx.drawImage(srcImg,(srcImg.width-s)/2,(srcImg.height-s)/2,s,s,0,0,N,N);
+  function run(){ if(srcImg) draw(srcImg, srcImg.width, srcImg.height); }
+
+  function draw(src, sw, sh){
+    const s=Math.min(sw,sh);
+    tctx.drawImage(src,(sw-s)/2,(sh-s)/2,s,s,0,0,N,N);
     const rgba=tctx.getImageData(0,0,N,N).data;
     const gray=DIP.toGray(rgba,N,N);
     let enh=DIP.equalize(gray);
@@ -571,15 +615,16 @@ buildImgSel(); buildTrack(); render();
     [[1,gray],[2,enh],[3,med],[4,seg],[5,mor]].forEach(([i,b])=>
       cx[i].putImageData(DIP.toImageData(b,N,N),0,0));
     const f=b=>(DIP.foregroundFraction(b)*100).toFixed(1)+"%";
-    $("v0").textContent=srcImg.width+"\u00d7"+srcImg.height;
+    $("v0").textContent=sw+"\u00d7"+sh;
     $("v1").textContent="\u03c3 "+DIP.stats(gray).std.toFixed(1);
     $("v2").textContent="\u03c3 "+DIP.stats(enh).std.toFixed(1);
     $("v3").textContent="\u03c3 "+DIP.stats(med).std.toFixed(1);
     $("v4").textContent="t="+t+" \u00b7 "+f(seg);
     $("v5").textContent=f(mor);
   }
+
   const boot=new Image();
-  boot.onload=()=>{srcImg=boot; $("dropmsg").textContent="Dataset sample loaded. Drop your own image to replace it."; run();};
+  boot.onload=()=>{srcImg=boot; $("dropmsg").textContent="Dataset sample loaded. Start the camera, or drop in your own image."; run();};
   boot.src=A["glasses_1raw"];
 })();
 </script>
